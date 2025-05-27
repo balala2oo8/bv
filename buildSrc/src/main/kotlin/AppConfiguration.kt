@@ -26,7 +26,8 @@ object AppConfiguration {
     }
 
     private fun initConfigurations() {
-        val googleServicesJsonPath = "pwd".exec() + "/app/google-services.json"
+        val projectDir = System.getProperty("user.dir")
+        val googleServicesJsonPath = "$projectDir/app/google-services.json"
         val googleServicesJsonFile = File(googleServicesJsonPath)
         googleServicesAvailable =
             googleServicesJsonFile.exists() && googleServicesJsonFile.readText().let {

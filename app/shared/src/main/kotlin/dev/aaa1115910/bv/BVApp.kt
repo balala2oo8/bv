@@ -12,6 +12,8 @@ import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
 import dev.aaa1115910.biliapi.repositories.AuthRepository
 import dev.aaa1115910.biliapi.repositories.ChannelRepository
 import dev.aaa1115910.biliapi.repositories.CommentRepository
+import dev.aaa1115910.biliapi.repositories.CoinRepository
+import dev.aaa1115910.biliapi.repositories.LikeRepository
 import dev.aaa1115910.biliapi.repositories.FavoriteRepository
 import dev.aaa1115910.biliapi.repositories.HistoryRepository
 import dev.aaa1115910.biliapi.repositories.LoginRepository
@@ -176,13 +178,15 @@ val appModule = module {
     single { LoginRepository() }
     single { VideoInfoRepository() }
     single { ChannelRepository() }
+    single { LikeRepository(get()) }
+    single { CoinRepository(get()) }
     single { FavoriteRepository(get()) }
     single { HistoryRepository(get(), get()) }
     single { ToViewRepository(get(), get()) }
     single { SearchRepository(get(), get()) }
     single { VideoPlayRepository(get(), get()) }
     single { RecommendVideoRepository(get(), get()) }
-    single { VideoDetailRepository(get(), get(), get()) }
+    single { VideoDetailRepository(get(), get(), get(), get(), get()) }
     single { SeasonRepository(get()) }
     single { dev.aaa1115910.biliapi.repositories.UserRepository(get(), get()) }
     single { PgcRepository() }
