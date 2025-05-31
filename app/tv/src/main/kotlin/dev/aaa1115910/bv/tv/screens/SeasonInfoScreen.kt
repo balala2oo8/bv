@@ -160,9 +160,9 @@ fun SeasonInfoScreen(
             }
         }
 
-    val onClickFollow: (Boolean) -> Unit = { isFollowing ->
+    val onClickFollow: (Boolean) -> Unit = {
         scope.launch(Dispatchers.IO) {
-            if (isFollowing) seasonViewModel.unFollowSeason() else seasonViewModel.followSeason()
+            if (seasonViewModel.isFollowing) seasonViewModel.unFollowSeason() else seasonViewModel.followSeason()
         }
     }
 
