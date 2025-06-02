@@ -22,7 +22,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.aaa1115910.bv.BuildConfig
 import dev.aaa1115910.bv.R
-import dev.aaa1115910.bv.component.settings.CookiesDialog
 import dev.aaa1115910.bv.component.settings.SettingListItem
 import dev.aaa1115910.bv.component.settings.SettingSwitchListItem
 import dev.aaa1115910.bv.player.entity.Resolution
@@ -37,7 +36,6 @@ fun OtherSetting(
 ) {
     val context = LocalContext.current
 
-    var showCookiesDialog by remember { mutableStateOf(false) }
     var showFps by remember { mutableStateOf(Prefs.showFps) }
     var updateAlpha by remember { mutableStateOf(Prefs.updateAlpha) }
     var enableFfmpegAudioRenderer by remember { mutableStateOf(Prefs.enableFfmpegAudioRenderer) }
@@ -70,13 +68,6 @@ fun OtherSetting(
                         Prefs.enableFirebaseCollection = it
                         FirebaseUtil.setCrashlyticsCollectionEnabled(it)
                     }
-                )
-            }
-            item {
-                SettingListItem(
-                    title = stringResource(R.string.settings_other_cookies_title),
-                    supportText = stringResource(R.string.settings_other_cookies_text),
-                    onClick = { showCookiesDialog = true }
                 )
             }
             item {
@@ -156,9 +147,4 @@ fun OtherSetting(
             }
         }
     }
-
-    CookiesDialog(
-        show = showCookiesDialog,
-        onHideDialog = { showCookiesDialog = false }
-    )
 }
