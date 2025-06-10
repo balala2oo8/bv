@@ -40,8 +40,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import dev.aaa1115910.bv.R
-import dev.aaa1115910.bv.component.HomeTopNavItem
-import dev.aaa1115910.bv.component.UserPanel
+import dev.aaa1115910.bv.tv.component.UserPanel
 import dev.aaa1115910.bv.tv.activities.settings.SettingsActivity
 import dev.aaa1115910.bv.tv.activities.user.FavoriteActivity
 import dev.aaa1115910.bv.tv.activities.user.FollowingSeasonActivity
