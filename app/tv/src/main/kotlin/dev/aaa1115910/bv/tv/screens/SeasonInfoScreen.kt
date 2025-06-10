@@ -312,7 +312,7 @@ fun SeasonInfoScreen(
                                     playAid,
                                     playCid,
                                     playEpid,
-                                    seasonViewModel.lastPlayProgress?.lastEpIndex ?: "",
+                                    seasonViewModel.lastPlayProgress?.lastEpIndex ?: (seasonViewModel.seasonData?.episodes?.find { it.cid == playCid })?.title ?: "",
                                     seasonViewModel.lastPlayProgress?.lastTime ?: 0
                                 )
 
@@ -322,7 +322,8 @@ fun SeasonInfoScreen(
                                         cid = episode.cid,
                                         epid = episode.id,
                                         seasonId = seasonViewModel.seasonData?.seasonId,
-                                        title = runCatching {
+                                        title = seasonViewModel.seasonData!!.title,
+                                        partTitle = runCatching {
                                             "第 ${episode.title.toInt()} 集"
                                         }.getOrDefault(episode.title) + " " + episode.longTitle,
                                         index = index,
@@ -353,7 +354,8 @@ fun SeasonInfoScreen(
                                             cid = episode.cid,
                                             epid = episode.id,
                                             seasonId = seasonViewModel.seasonData?.seasonId,
-                                            title = runCatching {
+                                            title = seasonViewModel.seasonData!!.title,
+                                            partTitle = runCatching {
                                                 "第 ${episode.title.toInt()} 集"
                                             }.getOrDefault(episode.title) + " " + episode.longTitle,
                                             index = index,
@@ -862,11 +864,22 @@ fun SeasonEpisodeRow(
                     played = if (episode.id == lastPlayedId) lastPlayedTime else 0,
                     duration = episode.duration,
                     onClick = {
+                        val pTitle = if (episode.longTitle.isNotEmpty()) {
+                            episode.longTitle
+                        } else if (title == "正片") {
+                            //如果 title 是数字的话，就会返回 "第 x 集"
+                            //如果 title 不是数字的话（例如 SP），就会原样使用 title
+                            runCatching {
+                                "第 ${episode.title.toInt()} 集"
+                            }.getOrDefault(episode.title)
+                        } else {
+                            episode.title
+                        }
                         onClick(
                             episode.aid,
                             episode.cid,
                             episode.id,
-                            episode.longTitle,
+                            pTitle,
                             if (episode.id == lastPlayedId) lastPlayedTime else 0
                         )
                     }
