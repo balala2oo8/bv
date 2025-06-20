@@ -1,13 +1,7 @@
 package dev.aaa1115910.bv.viewmodel
 
 import android.net.Uri
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
@@ -18,12 +12,7 @@ import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.entity.PlayData
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskSegment
-import dev.aaa1115910.biliapi.entity.video.HeartbeatVideoType
-import dev.aaa1115910.biliapi.entity.video.Subtitle
-import dev.aaa1115910.biliapi.entity.video.SubtitleAiStatus
-import dev.aaa1115910.biliapi.entity.video.SubtitleAiType
-import dev.aaa1115910.biliapi.entity.video.SubtitleType
-import dev.aaa1115910.biliapi.entity.video.VideoShot
+import dev.aaa1115910.biliapi.entity.video.*
 import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.repositories.VideoPlayRepository
 import dev.aaa1115910.bilisubtitle.SubtitleParser
@@ -31,20 +20,9 @@ import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
 import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
-import dev.aaa1115910.bv.player.entity.Audio
-import dev.aaa1115910.bv.player.entity.DanmakuType
-import dev.aaa1115910.bv.player.entity.RequestState
-import dev.aaa1115910.bv.player.entity.Resolution
-import dev.aaa1115910.bv.player.entity.VideoAspectRatio
-import dev.aaa1115910.bv.player.entity.VideoCodec
+import dev.aaa1115910.bv.player.entity.*
 import dev.aaa1115910.bv.repository.VideoInfoRepository
-import dev.aaa1115910.bv.util.Prefs
-import dev.aaa1115910.bv.util.fError
-import dev.aaa1115910.bv.util.fException
-import dev.aaa1115910.bv.util.fInfo
-import dev.aaa1115910.bv.util.fWarn
-import dev.aaa1115910.bv.util.swapList
-import dev.aaa1115910.bv.util.swapListWithMainContext
+import dev.aaa1115910.bv.util.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -53,10 +31,8 @@ import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.koin.android.annotation.KoinViewModel
 import java.net.URI
 
-@KoinViewModel
 class VideoPlayerV3ViewModel(
     private val videoInfoRepository: VideoInfoRepository,
     private val videoPlayRepository: VideoPlayRepository,
@@ -66,29 +42,6 @@ class VideoPlayerV3ViewModel(
     var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
     var danmakuPlayer: DanmakuPlayer? by mutableStateOf(null)
     var show by mutableStateOf(false)
-    
-    override fun onCleared() {
-        super.onCleared()
-        logger.fInfo { "VideoPlayerV3ViewModel onCleared" }
-        try {
-            videoPlayer?.release()
-            videoPlayer = null
-        } catch (e: Exception) {
-            logger.fError { "Error releasing video player: ${e.message}" }
-        }
-
-        try {
-            danmakuPlayer?.release()
-            danmakuPlayer = null
-            danmakuData.clear()
-            danmakuMasks.clear()
-        } catch (e: Exception) {
-            logger.fError { "Error releasing danmaku player: ${e.message}" }
-        }
-
-        // 清除可能未被GC回收的资源
-        currentSubtitleData.clear()
-    }
 
     var loadState by mutableStateOf(RequestState.Ready)
     var errorMessage by mutableStateOf("")
@@ -170,15 +123,15 @@ class VideoPlayerV3ViewModel(
         epid?.let { this.epid = it }
         seasonId?.let { this.seasonId = it }
         viewModelScope.launch(Dispatchers.Default) {
-            addLogs("加载视频中")
+            // addLogs("加载视频中")
             releaseDanmakuPlayer()
             initDanmakuPlayer()
-            addLogs("初始化弹幕引擎")
-            if (epid != null || seasonId != null) {
-                addLogs("av$avid，cid:$cid, epid:$epid, seasonId:$seasonId")
-            } else {
-                addLogs("av$avid，cid:$cid")
-            }
+            // addLogs("初始化弹幕引擎")
+            // if (epid != null || seasonId != null) {
+            //     addLogs("av$avid，cid:$cid, epid:$epid, seasonId:$seasonId")
+            // } else {
+            //     addLogs("av$avid，cid:$cid")
+            // }
 
             val lastPlayEnabledSubtitle = currentSubtitleId != -1L
             if (lastPlayEnabledSubtitle) {
@@ -187,7 +140,7 @@ class VideoPlayerV3ViewModel(
 
             updateSubtitle()
             loadPlayUrl(avid, cid, epid ?: 0, preferApi = Prefs.apiType, proxyArea = proxyArea)
-            addLogs("加载弹幕中")
+            // addLogs("加载弹幕中")
             loadDanmaku(cid)
             updateDanmakuMask()
 
@@ -274,29 +227,17 @@ class VideoPlayerV3ViewModel(
             logger.fInfo { "Video available audio: $audioList" }
             availableAudio.swapListWithMainContext(audioList)
 
-            // 确定使用哪个默认分辨率
-            val defaultQualityToUse = if (isVerticalVideo && Prefs.portraitVideoQualityLimitMax1080P && Prefs.defaultQuality >= Resolution.R4K) {
-                // 如果是竖屏视频且用户设置了竖屏视频限制最高使用1080P
-                Resolution.R1080P60
-            } else {
-                // 否则使用普通设置
-                Prefs.defaultQuality
-            }
-
             //先确认最终所选清晰度
             val existDefaultResolution =
-                availableQuality.find { it == defaultQualityToUse } != null
+                availableQuality.find { it == Prefs.defaultQuality } != null
 
             if (!existDefaultResolution) {
                 val tempList = resolutionList.sortedByDescending { it.code }
-                val currentQuality = tempList.firstOrNull { it.code < defaultQualityToUse.code }
+                val currentQuality = tempList.firstOrNull { it.code < Prefs.defaultQuality.code }
                     ?: tempList.last()
                 withContext(Dispatchers.Main) {
                     this@VideoPlayerV3ViewModel.currentQuality = currentQuality
                 }
-            } else {
-                // 如果默认清晰度可用，直接使用
-                withContext(Dispatchers.Main) { currentQuality = defaultQualityToUse }
             }
 
             //确认最终所选音质
@@ -326,7 +267,7 @@ class VideoPlayerV3ViewModel(
             loadState = RequestState.Failed
             logger.fException(it) { "Load video failed" }
         }.onSuccess {
-            addLogs("加载视频地址成功")
+            // addLogs("加载视频地址成功")
             loadState = RequestState.Success
             logger.fInfo { "Load play url success" }
         }
@@ -341,7 +282,6 @@ class VideoPlayerV3ViewModel(
             withContext(Dispatchers.Main) {
                 currentVideoCodec = VideoCodec.fromCodecId(videoItem.codecId)
             }
-            logger.fInfo { "App API fixed, Select codec: $currentVideoCodec" }
             return
         }
 
@@ -417,8 +357,8 @@ class VideoPlayerV3ViewModel(
             audioUrl = selectOfficialCdnUrl(audioUrls.filterNotNull())
         }
 
-        addLogs("video host: ${with(URI(videoUrl)) { "$scheme://$authority" }}")
-        addLogs("audio host: ${with(URI(audioUrl)) { "$scheme://$authority" }}")
+        addLogs("视频地址: ${with(URI(videoUrl)) { "$scheme://$authority" }}")
+        addLogs("音频地址: ${with(URI(audioUrl)) { "$scheme://$authority" }}")
 
         logger.fInfo { "Select audio: $audioItem" }
         addLogs("音频编码：${(Audio.fromCode(audioItem?.codecId ?: 0))?.getDisplayName(BVApp.context) ?: "未知"}")
@@ -489,7 +429,7 @@ class VideoPlayerV3ViewModel(
                 availableSubtitle.addAll(subtitleData)
                 availableSubtitle.sortBy { it.id }
             }
-            addLogs("获取到 ${subtitleData.size} 条字幕: ${subtitleData.map { it.langDoc }}")
+            // addLogs("获取到 ${subtitleData.size} 条字幕: ${subtitleData.map { it.langDoc }}")
             logger.fInfo { "Update subtitle size: ${subtitleData.size}" }
         }.onFailure {
             addLogs("获取字幕失败：${it.localizedMessage}")
@@ -513,9 +453,6 @@ class VideoPlayerV3ViewModel(
 
     private suspend fun addLogs(text: String) {
         logger.fInfo { text }
-        if (!Prefs.playerShowDebugInfo) {
-            return
-        }
         val lines = logs.lines().toMutableList()
         lines.add(text)
         while (lines.size > 8) {
@@ -587,7 +524,7 @@ class VideoPlayerV3ViewModel(
                 addLogs("加载字幕 $subtitleName 失败: ${it.localizedMessage}")
             }.onSuccess {
                 logger.fInfo { "Load subtitle $subtitleName success" }
-                addLogs("加载字幕 $subtitleName 成功，数量: ${currentSubtitleData.size}")
+                // addLogs("加载字幕 $subtitleName 成功，数量: ${currentSubtitleData.size}")
             }
         }
     }
