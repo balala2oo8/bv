@@ -154,16 +154,7 @@ fun MainScreen(
                     modifier = Modifier.fillMaxWidth(),
                     isLogin = userViewModel.isLogin,
                     avatar = userViewModel.face,
-                    username = userViewModel.username,
-                    //avatar = "https://i2.hdslb.com/bfs/face/ef0457addb24141e15dfac6fbf45293ccf1e32ab.jpg",
-                    //username = "碧诗",
                     onDrawerItemChanged = { selectedDrawerItem = it },
-                    onDrawerItemfocused = {
-                        focusedDrawerItem = it
-                    },
-                    onOpenSettings = {
-                        context.startActivity(Intent(context, SettingsActivity::class.java))
-                    },
                     onShowUserPanel = {
                         showUserPanel = true
                     },

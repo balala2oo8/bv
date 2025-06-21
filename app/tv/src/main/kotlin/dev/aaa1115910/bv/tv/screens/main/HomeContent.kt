@@ -7,19 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -67,18 +58,14 @@ fun HomeContent(
 
     // 从全局状态获取上次选择的标签位置，如果没有则默认为Recommend
     // 将这个值提到可组合函数的顶部，避免在重组时重新计算
-    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.Home]
-    var selectedTab by remember(initialSelectedTabIndex) {
-        mutableStateOf(
-            initialSelectedTabIndex
-                ?.let { HomeTopNavItem.entries.getOrNull(it) }
-                ?: HomeTopNavItem.Recommend
-        )
+    val initialSelectedTab = currentSelectedTabs[DrawerItem.Home] as? HomeTopNavItem
+    var selectedTab by remember(initialSelectedTab) {
+        mutableStateOf(initialSelectedTab ?: HomeTopNavItem.Recommend)
     }
 
     // 当选中标签变化时，保存到全局状态
     LaunchedEffect(selectedTab) {
-        currentSelectedTabs[DrawerItem.Home] = selectedTab.ordinal
+        currentSelectedTabs[DrawerItem.Home] = selectedTab
     }
     val currentListOnTop by remember {
         derivedStateOf {

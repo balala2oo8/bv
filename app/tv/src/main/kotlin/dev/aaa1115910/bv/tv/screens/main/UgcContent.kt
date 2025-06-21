@@ -108,18 +108,18 @@ fun UgcContent(
     val tabSelectionDebouncer = rememberDebouncer<UgcTopNavItem>(280L)
 
     // 使用remember的key参数确保只有在DrawerItem.UGC的tab状态变化时才重新计算
-    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.UGC]
+    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.UGC] as UgcTopNavItem
     var selectedTab by remember(initialSelectedTabIndex) {
         mutableStateOf(
             initialSelectedTabIndex
-                ?.let { UgcTopNavItem.entries.getOrNull(it) }
+                ?.let { UgcTopNavItem.entries.getOrNull(it.ordinal) }
                 ?: UgcTopNavItem.Douga
         )
     }
 
     // 当选中标签变化时，保存到全局状态
     LaunchedEffect(selectedTab) {
-        currentSelectedTabs[DrawerItem.UGC] = selectedTab.ordinal
+        currentSelectedTabs[DrawerItem.UGC] = selectedTab
     }
 
     //启动时刷新数据

@@ -75,18 +75,17 @@ fun PgcContent(
     val tabSelectionDebouncer = rememberDebouncer<PgcTopNavItem>(280L)
 
     // 使用remember的key参数确保只有在DrawerItem.PGC的tab状态变化时才重新计算
-    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.PGC]
+    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.PGC] as? PgcTopNavItem
     var selectedTab by remember(initialSelectedTabIndex) {
         mutableStateOf(
             initialSelectedTabIndex
-                ?.let { PgcTopNavItem.entries.getOrNull(it) }
+                ?.let { PgcTopNavItem.entries.getOrNull(it.ordinal) }
                 ?: PgcTopNavItem.Anime
         )
     }
-
     // 当选中标签变化时，保存到全局状态
     LaunchedEffect(selectedTab) {
-        currentSelectedTabs[DrawerItem.PGC] = selectedTab.ordinal
+        currentSelectedTabs[DrawerItem.PGC] = selectedTab
     }
 
     val currentListOnTop by remember {

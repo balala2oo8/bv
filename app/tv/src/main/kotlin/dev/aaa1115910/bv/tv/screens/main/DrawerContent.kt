@@ -1,34 +1,10 @@
 package dev.aaa1115910.bv.tv.screens.main
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.OndemandVideo
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,217 +15,159 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Icon
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
-import androidx.tv.material3.Text
+import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import dev.aaa1115910.bv.tv.component.TopNavItem
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.ifElse
 import dev.aaa1115910.bv.util.isDpadRight
+import dev.aaa1115910.bv.util.isDpadUp
 import dev.aaa1115910.bv.util.isKeyDown
-import dev.aaa1115910.bv.util.onDelayFocusChanged
 
 // 创建全局的FocusRequester映射表，方便外部使用
 val drawerItemFocusRequesters = mutableMapOf<DrawerItem, FocusRequester>().apply {
-    DrawerItem.entries.filter { it != DrawerItem.User && it != DrawerItem.Settings }
+    DrawerItem.entries.filter { it != DrawerItem.User }
         .forEach { item ->
             this[item] = FocusRequester()
         }
 }
 
 // 用于记住每个内容页当前选中的Tab
-val currentSelectedTabs = mutableStateMapOf<DrawerItem, Int>()
+val currentSelectedTabs = mutableStateMapOf<DrawerItem, TopNavItem>()
 
 @Composable
 fun DrawerContent(
     modifier: Modifier = Modifier,
     isLogin: Boolean = false,
     avatar: String = "",
-    username: String = "",
     onDrawerItemChanged: (DrawerItem) -> Unit = {},
-    onDrawerItemfocused: (DrawerItem) -> Unit = {},
-    onOpenSettings: () -> Unit = {},
     onShowUserPanel: () -> Unit = {},
     onFocusToContent: () -> Unit = {},
     onLogin: () -> Unit = {}
 ) {
     var selectedItem by remember { mutableStateOf(DrawerItem.Home) }
-    // 添加一个新的状态用于即时跟踪获得焦点的项目
-    var focusedItem by remember { mutableStateOf(DrawerItem.Home) }
-
-    var focusOnContent by remember { mutableStateOf(true) }
+    var focusInUser by remember { mutableStateOf(false) }
+    val centerFocusRequester = remember { FocusRequester() }
+    val itemColors = NavigationDrawerItemDefaults.colors()
+    val iconColors = IconButtonDefaults.colors(
+        containerColor = when {
+            selectedItem == DrawerItem.User -> itemColors.selectedContentColor
+            else -> itemColors.containerColor
+        },
+        focusedContainerColor = itemColors.focusedContainerColor
+    )
 
     LaunchedEffect(selectedItem) {
         onDrawerItemChanged(selectedItem)
     }
 
-    LaunchedEffect(focusedItem) {
-        onDrawerItemfocused(focusedItem)
-    }
-
     Column(
         modifier = modifier
-            .fillMaxSize()
-            .padding(4.dp)
+            .width(44.dp)
+            .fillMaxHeight()
+            .padding(vertical = 12.dp)
             .onPreviewKeyEvent { keyEvent ->
-                if (keyEvent.isDpadRight()) {
-                    if (keyEvent.isKeyDown()) {
+                if (keyEvent.isKeyDown()) {
+                    if (keyEvent.isDpadRight()) {
                         onFocusToContent()
+                        return@onPreviewKeyEvent true
+                    }
+                    // 已经是最上时拦截事件
+                    if (keyEvent.isDpadUp() && focusInUser) {
                         return@onPreviewKeyEvent true
                     }
                 }
                 false
-            }
-            .onFocusChanged {
-                if (it.hasFocus) {
-                    drawerItemFocusRequesters[focusedItem]?.requestFocus()
-                }
-            }
-            .onDelayFocusChanged(delayTime = 50) {
-                focusOnContent = !it.hasFocus
             },
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        NavigationRailItem(
-            modifier = Modifier
-                .onFocusChanged {
-                    if (it.hasFocus && !focusOnContent) {
-                        focusedItem = DrawerItem.User
-                    }
-                },
+        // 用户头像
+        IconButton(
+            modifier = Modifier.onFocusChanged {
+                focusInUser = it.hasFocus
+            },
+            colors = iconColors,
             onClick = {
                 if (isLogin) {
                     onShowUserPanel()
                 } else {
                     onLogin()
                 }
-                focusedItem = DrawerItem.User
-            },
-            selected = focusedItem == DrawerItem.User,
-            colors = NavigationRailItemDefaults.colors(
-                indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
-            ),
-            icon = {
-                if (isLogin) {
-                    Surface(
+            }
+        ) {
+            if (isLogin) {
+                Surface(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape),
+                    colors = SurfaceDefaults.colors(
+                        containerColor = Color.Gray
+                    )
+                ) {
+                    AsyncImage(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape),
-                        colors = SurfaceDefaults.colors(
-                            containerColor = Color.Gray
-                        )
-                    ) {
-                        AsyncImage(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape),
-                            model = avatar,
-                            contentDescription = null,
-                            contentScale = ContentScale.FillBounds
-                        )
-                    }
-                } else {
-                    Icon(
-                        imageVector = DrawerItem.User.displayIcon,
+                        model = avatar,
                         contentDescription = null,
-                        tint = if (!focusOnContent && focusedItem == DrawerItem.User) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
+                        contentScale = ContentScale.FillBounds
                     )
                 }
-            },
-            label = { Text(
-                modifier = Modifier.offset(y = (-4).dp),
-                text = if (isLogin) username
-                else DrawerItem.User.displayName,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium
-            ) }
-        )
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
-        ) {
-            listOf(
-                DrawerItem.Search,
-                DrawerItem.Home,
-                DrawerItem.UGC,
-                DrawerItem.PGC,
-            ).forEach { item ->
-                item {
-                    NavigationRailItem(
-                        modifier = Modifier
-                            .focusRequester(drawerItemFocusRequesters[item]!!)
-                            // 立即更新focusedItem以反映视觉状态
-                            .onFocusChanged {
-                                if (it.hasFocus && !focusOnContent) {
-                                    focusedItem = item
-                                }
-                            }
-                            // 延迟更新selectedItem以延迟右侧内容的切换
-                            .onDelayFocusChanged {
-                                if (it.hasFocus) {
-                                    selectedItem = focusedItem
-                                }
-                            },
-                        onClick = {
-                            selectedItem = item
-                            focusedItem = item
-                        },
-                        // 使用focusedItem来决定视觉状态
-                        selected = focusedItem == item,
-                        colors = NavigationRailItemDefaults.colors(
-                            indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
-                        ),
-                        icon = {
-                            Icon(
-                                imageVector = item.displayIcon,
-                                contentDescription = null,
-                                tint = if (!focusOnContent && focusedItem == item) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
-                            )
-                        },
-                        label = {
-                            Text(
-                                modifier = Modifier.offset(y = (-4).dp),
-                                text = item.displayName,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    )
-                }
+            } else {
+                Icon(
+                    imageVector = DrawerItem.User.displayIcon,
+                    contentDescription = null
+                )
             }
         }
-        NavigationRailItem(
-            modifier = Modifier.onFocusChanged {
-                    if (it.hasFocus && !focusOnContent) {
-                        focusedItem = DrawerItem.Settings
-                    }
-                },
-            onClick = {
-                onOpenSettings()
-                focusedItem = DrawerItem.Settings
-            },
-            selected = focusedItem == DrawerItem.Settings,
-            colors = NavigationRailItemDefaults.colors(
-                indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
-            ),
-            icon = {
+        Spacer(modifier = Modifier.weight(1f))
+
+        listOf(
+            DrawerItem.Search,
+            DrawerItem.Home,
+            DrawerItem.UGC,
+            DrawerItem.PGC,
+        ).forEach { item ->
+            IconButton(
+                modifier = Modifier
+                    .focusRequester(drawerItemFocusRequesters[item]!!)
+                    .onFocusChanged { if (it.hasFocus) selectedItem = item }
+                    .ifElse(
+                        item == DrawerItem.Home,
+                        Modifier.focusRequester(centerFocusRequester)
+                    ),
+                colors = iconColors,
+                onClick = {
+                    selectedItem = item
+                    onFocusToContent()
+                }
+            ) {
                 Icon(
-                    imageVector = DrawerItem.Settings.displayIcon,
-                    contentDescription = null,
-                    tint = if (!focusOnContent && focusedItem == DrawerItem.Settings) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
-                )
-            },
-            label = {
-                Text(
-                    modifier = Modifier.offset(y = (-4).dp),
-                    text = DrawerItem.Settings.displayName,
-                    style = MaterialTheme.typography.bodyMedium
+                    imageVector = item.displayIcon,
+                    contentDescription = null
                 )
             }
-        )
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+        IconButton(
+            modifier = Modifier
+                .focusRequester(drawerItemFocusRequesters[DrawerItem.Settings]!!)
+                .onFocusChanged { if (it.hasFocus) selectedItem = DrawerItem.Settings },
+            colors = iconColors,
+            onClick = {
+                selectedItem = DrawerItem.Settings
+                onFocusToContent()
+            }
+        ) {
+            Icon(
+                imageVector = DrawerItem.Settings.displayIcon,
+                contentDescription = null
+            )
+        }
     }
 }
 
@@ -269,19 +187,6 @@ enum class DrawerItem(
 @Composable
 private fun DrawerContentPreview() {
     BVTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(180.dp)
-        ) {
-            NavigationRail(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .width(72.dp),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            ) {
-                DrawerContent()
-            }
-        }
+        DrawerContent()
     }
 }
