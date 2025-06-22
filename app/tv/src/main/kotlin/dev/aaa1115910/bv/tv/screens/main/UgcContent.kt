@@ -23,6 +23,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import dev.aaa1115910.biliapi.entity.ugc.UgcTypeV2
+import dev.aaa1115910.bv.tv.component.HomeTopNavItem
+import dev.aaa1115910.bv.tv.component.PgcTopNavItem
 import dev.aaa1115910.bv.tv.component.TopNav
 import dev.aaa1115910.bv.tv.component.UgcTopNavItem
 import dev.aaa1115910.bv.tv.screens.main.ugc.AiContent
@@ -108,7 +110,7 @@ fun UgcContent(
     val tabSelectionDebouncer = rememberDebouncer<UgcTopNavItem>(280L)
 
     // 使用remember的key参数确保只有在DrawerItem.UGC的tab状态变化时才重新计算
-    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.UGC] as UgcTopNavItem
+    val initialSelectedTabIndex = currentSelectedTabs[DrawerItem.UGC] as? UgcTopNavItem
     var selectedTab by remember(initialSelectedTabIndex) {
         mutableStateOf(
             initialSelectedTabIndex
