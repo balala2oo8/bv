@@ -44,16 +44,34 @@ class FavoriteViewModel(
 
     var updatingFolders by mutableStateOf(false)
     var updatingFolderItems by mutableStateOf(false)
+    private var updateFolderJob: Job? = null
 
     init {
         updateFoldersInfo()
     }
 
-    private fun updateFoldersInfo() {
+    fun clearData() {
+        favoriteFolderMetadataList.clear()
+        favorites.clear()
+        currentFavoriteFolderMetadata = null
+        pageSize = 20
+        pageNumber = 1
+        hasMore = true
+        updatingFolders = false
+        updatingFolderItems = false
+        updateFolderJob = null
+        updateJob = null
+    }
+
+    fun updateFoldersInfo(force: Boolean = false) {
+        if (force) {
+            updateFolderJob?.cancel()
+            updatingFolders = false
+        }
         if (updatingFolders) return
         updatingFolders = true
         logger.fInfo { "Updating favorite folders" }
-        viewModelScope.launch(Dispatchers.IO) {
+        updateFolderJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 val favoriteFolderMetadataList =
                     favoriteRepository.getAllFavoriteFolderMetadataList(

@@ -1,27 +1,10 @@
 package dev.aaa1115910.bv.tv.screens.user
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,7 +32,9 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun FollowingSeasonScreen(
     modifier: Modifier = Modifier,
-    followingSeasonViewModel: FollowingSeasonViewModel = koinViewModel()
+    followingSeasonViewModel: FollowingSeasonViewModel = koinViewModel(),
+    lazyGridState: LazyGridState = rememberLazyGridState(),
+    onlyShowContent: Boolean = true
 ) {
     val context = LocalContext.current
     val logger = KotlinLogging.logger { }
@@ -95,6 +80,9 @@ fun FollowingSeasonScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
+            if (onlyShowContent) {
+                return@Scaffold
+            }
             Box(
                 modifier = Modifier.padding(
                     start = 48.dp,
@@ -156,6 +144,7 @@ fun FollowingSeasonScreen(
     ) { innerPadding ->
         LazyVerticalGrid(
             modifier = Modifier.padding(innerPadding),
+            state = lazyGridState,
             columns = GridCells.Fixed(6),
             contentPadding = PaddingValues(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),

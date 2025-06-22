@@ -40,6 +40,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import dev.aaa1115910.bv.R
+import dev.aaa1115910.bv.tv.component.HomeTopNavItem
 import dev.aaa1115910.bv.tv.component.UserPanel
 import dev.aaa1115910.bv.tv.activities.settings.SettingsActivity
 import dev.aaa1115910.bv.tv.activities.user.FavoriteActivity
@@ -56,6 +57,8 @@ import dev.aaa1115910.bv.tv.screens.main.UgcContent
 import dev.aaa1115910.bv.tv.screens.main.currentSelectedTabs
 import dev.aaa1115910.bv.tv.screens.main.drawerItemFocusRequesters
 import dev.aaa1115910.bv.tv.screens.search.SearchInputScreen
+import dev.aaa1115910.bv.tv.screens.settings.SettingsScreen
+import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fException
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.rememberDebouncer
@@ -84,9 +87,11 @@ fun MainScreen(
     var focusedDrawerItem by remember { mutableStateOf(DrawerItem.Home) }
 
     val mainFocusRequester = remember { FocusRequester() }
+    val mainNavFocusRequester = remember { FocusRequester() }
     val ugcFocusRequester = remember { FocusRequester() }
     val pgcFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = remember { FocusRequester() }
+    val settingFocusRequester = remember { FocusRequester() }
 
 //    val navController = rememberNavController()
 //    val startDestination = DrawerItem.Home
@@ -104,30 +109,27 @@ fun MainScreen(
     }
 
     val onFocusToContent: () -> Unit = {
-        when (focusedDrawerItem) {
-            DrawerItem.Home -> mainFocusRequester.requestFocus()
+        when (selectedDrawerItem) {
+            DrawerItem.Home -> {
+                if (!Prefs.isLogin && currentSelectedTabs[DrawerItem.Home] == HomeTopNavItem.Dynamics) {
+                    // 未登录情况下只能获取标题栏的焦点而不能是内容的
+                    mainNavFocusRequester.requestFocus()
+                } else {
+                    // todo:如果没加载到内容应该页不要获取这里的焦点
+                    mainFocusRequester.requestFocus()
+                }
+            }
             DrawerItem.UGC -> ugcFocusRequester.requestFocus()
             DrawerItem.PGC -> pgcFocusRequester.requestFocus()
             DrawerItem.Search -> searchFocusRequester.requestFocus()
-            else -> {
-                // 搜索+右侧是搜索->用户+用户内容不是放右侧的，右侧还是搜索。
-                // 让内容对应的菜单获得焦点
-                drawerItemFocusRequesters[selectedDrawerItem]?.requestFocus()
-                // 让右侧内容获得焦点
-                when (selectedDrawerItem) {
-                    DrawerItem.Home -> mainFocusRequester.requestFocus()
-                    DrawerItem.UGC -> ugcFocusRequester.requestFocus()
-                    DrawerItem.PGC -> pgcFocusRequester.requestFocus()
-                    DrawerItem.Search -> searchFocusRequester.requestFocus()
-                    else -> {}
-                }
-            }
+            DrawerItem.Settings -> settingFocusRequester.requestFocus()
+            else -> {}
         }
     }
 
     LaunchedEffect(Unit) {
         runCatching {
-            mainFocusRequester.requestFocus()
+            mainNavFocusRequester.requestFocus()
         }.onFailure {
             logger.fException(it) { "request default focus requester failed" }
         }
@@ -184,10 +186,14 @@ fun MainScreen(
                 }
             ) { screen ->
                 when (screen) {
-                    DrawerItem.Home -> HomeContent(navFocusRequester = mainFocusRequester)
-                    DrawerItem.UGC -> UgcContent(navFocusRequester = ugcFocusRequester)
-                    DrawerItem.PGC -> PgcContent(navFocusRequester = pgcFocusRequester)
+                    DrawerItem.Home -> HomeContent(
+                        contentFocusRequester = mainFocusRequester,
+                        navFocusRequester = mainNavFocusRequester
+                    )
+                    DrawerItem.UGC -> UgcContent(contentFocusRequester = ugcFocusRequester)
+                    DrawerItem.PGC -> PgcContent(contentFocusRequester = pgcFocusRequester)
                     DrawerItem.Search -> SearchInputScreen(defaultFocusRequester = searchFocusRequester)
+                    DrawerItem.Settings -> SettingsScreen(defaultFocusRequester = settingFocusRequester)
                     else -> {}
                 }
             }

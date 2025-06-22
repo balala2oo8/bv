@@ -50,7 +50,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun PgcContent(
     modifier: Modifier = Modifier,
-    navFocusRequester: FocusRequester,
+    contentFocusRequester: FocusRequester,
     pgcAnimeViewModel: PgcAnimeViewModel = koinViewModel(),
     pgcGuoChuangViewModel: PgcGuoChuangViewModel = koinViewModel(),
     pgcMovieViewModel: PgcMovieViewModel = koinViewModel(),
@@ -110,6 +110,7 @@ fun PgcContent(
 
     }
 
+    val navFocusRequester = remember { FocusRequester() }
     BackHandler(focusOnContent || topNavHasFocus) {
         logger.fInfo { "onFocusBackToNav" }
         // 如果顶部导航有焦点，则返回到左边栏的PGC位置
@@ -167,7 +168,7 @@ fun PgcContent(
         Box(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .focusRequester(contentFocusRequester)
                 .onFocusChanged { focusOnContent = it.hasFocus }
         ) {
             AnimatedContent(

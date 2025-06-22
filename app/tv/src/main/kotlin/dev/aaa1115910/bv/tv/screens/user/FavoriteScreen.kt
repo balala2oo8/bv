@@ -54,7 +54,8 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun FavoriteScreen(
     modifier: Modifier = Modifier,
-    favoriteViewModel: FavoriteViewModel = koinViewModel()
+    favoriteViewModel: FavoriteViewModel = koinViewModel(),
+    onlyShowContent: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -95,6 +96,9 @@ fun FavoriteScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
+            if (onlyShowContent) {
+                return@Scaffold
+            }
             Box(
                 modifier = Modifier.padding(start = 48.dp, top = 24.dp, bottom = 8.dp, end = 48.dp)
             ) {

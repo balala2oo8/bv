@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun UgcContent(
     modifier: Modifier = Modifier,
-    navFocusRequester: FocusRequester,
+    contentFocusRequester: FocusRequester,
     dougaState: UgcScaffoldState = rememberUgcScaffoldState(ugcType = UgcTypeV2.Douga),
     gameState: UgcScaffoldState = rememberUgcScaffoldState(ugcType = UgcTypeV2.Game),
     kichikuState: UgcScaffoldState = rememberUgcScaffoldState(ugcType = UgcTypeV2.Kichiku),
@@ -127,6 +127,7 @@ fun UgcContent(
 
     }
 
+    val navFocusRequester = remember { FocusRequester() }
     BackHandler(focusOnContent || topNavHasFocus) {
         logger.fInfo { "onFocusBackToNav" }
         if (topNavHasFocus) {
@@ -232,7 +233,7 @@ fun UgcContent(
         Box(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .focusRequester(contentFocusRequester)
                 .onFocusChanged { focusOnContent = it.hasFocus }
         ) {
             AnimatedContent(

@@ -42,6 +42,13 @@ class HistoryViewModel(
     private var cursor = 0L
     var updating by mutableStateOf(false)
 
+
+    fun clearData(){
+        histories.clear()
+        cursor = 0L
+        noMore = false
+        updating = false
+    }
     fun update() {
         viewModelScope.launch(Dispatchers.IO) {
             updateHistories()

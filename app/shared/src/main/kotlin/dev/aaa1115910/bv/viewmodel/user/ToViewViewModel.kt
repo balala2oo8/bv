@@ -41,6 +41,14 @@ class ToViewViewModel(
     private var cursor = 0L
     private var updating = false
 
+
+    fun clearData() {
+        histories.clear()
+        cursor = 0L
+        noMore = false
+        updating = false
+    }
+
     fun update() {
         viewModelScope.launch(Dispatchers.IO) {
             updateToView()

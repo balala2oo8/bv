@@ -55,7 +55,8 @@ import dev.aaa1115910.bv.util.requestFocus
 
 @Composable
 fun SettingsScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    defaultFocusRequester: FocusRequester,
 ) {
     val showLargeTitle by remember { derivedStateOf { true } }
     val titleFontSize by animateFloatAsState(
@@ -67,7 +68,8 @@ fun SettingsScreen(
     var focusInNav by remember { mutableStateOf(false) }
 
     Scaffold(
-        modifier = modifier,
+        modifier = modifier
+            .focusRequester(defaultFocusRequester),
         topBar = {
             Box(
                 modifier = Modifier.padding(

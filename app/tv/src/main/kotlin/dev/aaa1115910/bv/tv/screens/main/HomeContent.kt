@@ -1,12 +1,7 @@
 package dev.aaa1115910.bv.tv.screens.main
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Scaffold
@@ -18,6 +13,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import dev.aaa1115910.bv.tv.component.HomeTopNavItem
 import dev.aaa1115910.bv.tv.component.TopNav
+import dev.aaa1115910.bv.tv.screens.main.home.UserScreen
 import dev.aaa1115910.bv.tv.screens.main.home.DynamicsScreen
 import dev.aaa1115910.bv.tv.screens.main.home.PopularScreen
 import dev.aaa1115910.bv.tv.screens.main.home.RecommendScreen
@@ -37,6 +33,7 @@ import org.koin.androidx.compose.koinViewModel
 @Composable
 fun HomeContent(
     modifier: Modifier = Modifier,
+    contentFocusRequester: FocusRequester,
     navFocusRequester: FocusRequester,
     recommendViewModel: RecommendViewModel = koinViewModel(),
     popularViewModel: PopularViewModel = koinViewModel(),
@@ -49,6 +46,7 @@ fun HomeContent(
     val recommendState = rememberLazyListState()
     val popularState = rememberLazyListState()
     val dynamicState = rememberLazyListState()
+    val userState = rememberLazyListState()
     
     var focusOnContent by remember { mutableStateOf(false) }
     var topNavHasFocus by remember { mutableStateOf(false) }
@@ -74,6 +72,7 @@ fun HomeContent(
                     HomeTopNavItem.Recommend -> recommendState
                     HomeTopNavItem.Popular -> popularState
                     HomeTopNavItem.Dynamics -> dynamicState
+                    HomeTopNavItem.User -> userState
                 }
             ) {
                 firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0
@@ -177,7 +176,7 @@ fun HomeContent(
         Box(
             modifier = Modifier
                 .padding(innerPadding)
-                .fillMaxSize()
+                .focusRequester(contentFocusRequester)
                 .onFocusChanged { focusOnContent = it.hasFocus }
         ) {
             AnimatedContent(
@@ -191,6 +190,10 @@ fun HomeContent(
                     HomeTopNavItem.Recommend -> RecommendScreen(lazyListState = recommendState)
                     HomeTopNavItem.Popular -> PopularScreen(lazyListState = popularState)
                     HomeTopNavItem.Dynamics -> DynamicsScreen(lazyListState = dynamicState)
+                    HomeTopNavItem.User -> UserScreen(
+                        contentFocusRequester = contentFocusRequester,
+                        topNavFocusRequester = navFocusRequester
+                    )
                 }
             }
         }
