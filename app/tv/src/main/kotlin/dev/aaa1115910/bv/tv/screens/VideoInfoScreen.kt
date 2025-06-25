@@ -76,6 +76,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -998,13 +999,9 @@ fun VideoInfoData(
                             )
                         )
                 ) {
-                    Text(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = 10.dp, end = 16.dp),
-                        text = (videoDuration * 1000L).formatMinSec(),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodySmall
+                    CoverBottomInfo(
+                        play = if (videoDetail.stat.view >= 10000) "${videoDetail.stat.view / 10000}万" else "$videoDetail.stat.view",
+                        time = (videoDuration * 1000L).formatMinSec()
                     )
                 }
             }
@@ -1787,6 +1784,60 @@ private fun UpButtonPreview() {
             onClickUp = { followed = !followed },
             onAddFollow = {},
             onDelFollow = {}
+        )
+    }
+}
+
+@Composable
+private fun PlayText(
+    modifier: Modifier = Modifier,
+    text: String
+) {
+    if (text.isNotBlank()) {
+        Row(
+            modifier = modifier,
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Icon(
+                modifier = Modifier,
+                painter = painterResource(id = R.drawable.ic_play_count),
+                contentDescription = null,
+                tint = Color.White
+            )
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun CoverBottomInfo(
+    modifier: Modifier = Modifier,
+    play: String,
+    time: String
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(12.dp, 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            PlayText(text = play)
+        }
+        Text(
+            text = time,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            maxLines = 1
         )
     }
 }

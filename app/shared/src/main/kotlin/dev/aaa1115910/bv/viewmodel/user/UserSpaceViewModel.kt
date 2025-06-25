@@ -59,6 +59,7 @@ class UserSpaceViewModel(
                     VideoCardData(
                         avid = spaceVideoItem.aid,
                         title = spaceVideoItem.title,
+                        play = spaceVideoItem.play,
                         //TODO 这里在改造 app 端接口时，没找到在空间内显示为合集样式封面的UP,没法进一步测试接口
                         cover = spaceVideoItem.cover,
                         upName = spaceVideoItem.author,

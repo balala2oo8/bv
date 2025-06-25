@@ -120,6 +120,7 @@ class FavoriteViewModel(
                             avid = favoriteItem.id,
                             title = favoriteItem.title,
                             cover = favoriteItem.cover,
+                            play = favoriteItem.cntinfo.play,
                             upName = favoriteItem.upper.name,
                             time = favoriteItem.duration * 1000L,
                             pubTime = favoriteItem.favTime.toSmartDate() + context.getString(R.string.favorite_at)

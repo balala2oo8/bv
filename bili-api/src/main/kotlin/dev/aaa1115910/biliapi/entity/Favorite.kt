@@ -1,5 +1,6 @@
 package dev.aaa1115910.biliapi.entity
 
+import dev.aaa1115910.biliapi.http.entity.user.favorite.CntInfo
 import dev.aaa1115910.biliapi.http.entity.user.favorite.FavoriteItemId
 import kotlinx.serialization.Serializable
 
@@ -104,6 +105,7 @@ data class FavoriteItem(
     val type: FavoriteItemType,
     val title: String,
     val cover: String,
+    val cntinfo: CntInfo,
     val intro: String,
     val page: Int,
     val duration: Int,
@@ -119,6 +121,7 @@ data class FavoriteItem(
                 type = FavoriteItemType.fromValue(httpFavoriteItem.type),
                 title = httpFavoriteItem.title,
                 cover = httpFavoriteItem.cover,
+                cntinfo = httpFavoriteItem.cntInfo,
                 intro = httpFavoriteItem.intro,
                 page = httpFavoriteItem.page,
                 duration = httpFavoriteItem.duration,
