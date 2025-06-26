@@ -367,61 +367,62 @@ fun VideoInfoScreen(
         liked = videoDetailViewModel.videoDetail?.userActions?.like ?: false
     }
 
-   suspend fun addVideoLike(): Boolean {
-       return withContext(Dispatchers.IO) {
-           runCatching {
-               require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
-               logger.info { "Update video av${videoDetailViewModel.videoDetail?.aid} to liked" }
+    suspend fun addVideoLike(): Boolean {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
+                logger.info { "Update video av${videoDetailViewModel.videoDetail?.aid} to liked" }
 
-               likeRepository.addVideoLike(
-                   aid = videoDetailViewModel.videoDetail!!.aid,
-               )
-           }.onFailure {
-               logger.fInfo { "Update video liked status failed" }
-           }.onSuccess {
-               logger.fInfo { "Update video liked status success" }
-           }.isSuccess // 返回成功与否
-       }
-   }
-   suspend fun delVideoLike(): Boolean {
-       return withContext(Dispatchers.IO) {
-           runCatching {
-               require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
-               logger.info { "Delete video av${videoDetailViewModel.videoDetail?.aid} liked status" }
+                likeRepository.addVideoLike(
+                    aid = videoDetailViewModel.videoDetail!!.aid,
+                )
+            }.onFailure {
+                logger.fInfo { "Update video liked status failed" }
+            }.onSuccess {
+                logger.fInfo { "Update video liked status success" }
+            }.isSuccess // 返回成功与否
+        }
+    }
 
-               likeRepository.delVideoLike(
-                   aid = videoDetailViewModel.videoDetail!!.aid,
-               )
-           }.onFailure {
-               logger.fInfo { "Delete video liked status failed" }
-           }.onSuccess {
-               logger.fInfo { "Delete video liked status success" }
-           }.isSuccess // 返回成功与否
-       }
-   }
+    suspend fun delVideoLike(): Boolean {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
+                logger.info { "Delete video av${videoDetailViewModel.videoDetail?.aid} liked status" }
 
-   var isCoin by remember { mutableStateOf(false) }
+                likeRepository.delVideoLike(
+                    aid = videoDetailViewModel.videoDetail!!.aid,
+                )
+            }.onFailure {
+                logger.fInfo { "Delete video liked status failed" }
+            }.onSuccess {
+                logger.fInfo { "Delete video liked status success" }
+            }.isSuccess // 返回成功与否
+        }
+    }
 
-   val updateVideoisCoin = {
-       isCoin = videoDetailViewModel.videoDetail?.userActions?.coin ?: false
-   }
+    var isCoin by remember { mutableStateOf(false) }
 
-  suspend fun addVideoCoin(): Boolean {
-      return withContext(Dispatchers.IO) {
-          runCatching {
-              require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
-              logger.info { "Update video av${videoDetailViewModel.videoDetail?.aid} to coin" }
+    val updateVideoisCoin = {
+        isCoin = videoDetailViewModel.videoDetail?.userActions?.coin ?: false
+    }
 
-              coinRepository.addVideoCoin(
-                  aid = videoDetailViewModel.videoDetail!!.aid,
-              )
-          }.onFailure {
-              logger.fInfo { "Update video coin status failed" }
-          }.onSuccess {
-              logger.fInfo { "Update video coin status success" }
-          }.isSuccess // 返回成功与否
-      }
-  }
+    suspend fun addVideoCoin(): Boolean {
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                require(videoDetailViewModel.videoDetail?.aid != null) { "Video info is null" }
+                logger.info { "Update video av${videoDetailViewModel.videoDetail?.aid} to coin" }
+
+                coinRepository.addVideoCoin(
+                    aid = videoDetailViewModel.videoDetail!!.aid,
+                )
+            }.onFailure {
+                logger.fInfo { "Update video coin status failed" }
+            }.onSuccess {
+                logger.fInfo { "Update video coin status success" }
+            }.isSuccess // 返回成功与否
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (intent.hasExtra("aid")) {
@@ -641,9 +642,15 @@ fun VideoInfoScreen(
                                         val sectionIndex =
                                             videoDetailViewModel.videoDetail!!.ugcSeason!!.sections
                                                 .indexOfFirst { section -> section.episodes.any { it.cid == cid } }
-                                        val section = videoDetailViewModel.videoDetail!!.ugcSeason!!.sections.getOrNull(sectionIndex)
-                                        title = if (section?.title == "正片") section.episodes.find { it.cid == cid }!!.title else section?.title ?: ""
-                                        partTitle = if (section?.title == "正片") "" else section?.episodes?.find { it.cid == cid }!!.title
+                                        val section =
+                                            videoDetailViewModel.videoDetail!!.ugcSeason!!.sections.getOrNull(
+                                                sectionIndex
+                                            )
+                                        title =
+                                            if (section?.title == "正片") section.episodes.find { it.cid == cid }!!.title else section?.title
+                                                ?: ""
+                                        partTitle =
+                                            if (section?.title == "正片") "" else section?.episodes?.find { it.cid == cid }!!.title
                                         updateUgcSeasonSectionVideoList(sectionIndex)
                                     }
                                 } else {
@@ -796,14 +803,19 @@ fun VideoInfoScreen(
                                 onClickEp = { aid, cid ->
                                     logger.fInfo { "Click ugc season episode: [av:${videoDetailViewModel.videoDetail?.aid}, bv:${videoDetailViewModel.videoDetail?.bvid}, cid:$cid]" }
                                     updateUgcSeasonSectionVideoList(index)
-                                    val sectionTitle = videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(index)?.title
+                                    val sectionTitle =
+                                        videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(
+                                            index
+                                        )?.title
                                     val episode = section.episodes.find { it.cid == cid }
                                     launchPlayerActivity(
                                         context = context,
                                         avid = aid,
                                         cid = cid,
-                                        title = if (sectionTitle == "正片") episode!!.title else sectionTitle ?: videoDetailViewModel.videoDetail?.ugcSeason?.title ?: "",
-                                        partTitle = if (sectionTitle == "正片") if (episode!!.pages.size>1) episode.pages.first().title else "" else episode!!.title,
+                                        title = if (sectionTitle == "正片") episode!!.title else sectionTitle
+                                            ?: videoDetailViewModel.videoDetail?.ugcSeason?.title
+                                            ?: "",
+                                        partTitle = if (sectionTitle == "正片") if (episode!!.pages.size > 1) episode.pages.first().title else "" else episode!!.title,
                                         played = if (cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
                                         fromSeason = false,
                                         isVerticalVideo = containsVerticalScreenVideo,
@@ -815,7 +827,10 @@ fun VideoInfoScreen(
                                 },
                                 onClickEpPart = { episode, cid ->
                                     logger.fInfo { "Click ugc season episode part: [av:${videoDetailViewModel.videoDetail?.aid}, bv:${videoDetailViewModel.videoDetail?.bvid}, cid:$cid]" }
-                                    val sectionTitle = videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(index)?.title
+                                    val sectionTitle =
+                                        videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(
+                                            index
+                                        )?.title
                                     launchPlayerActivity(
                                         context = context,
                                         avid = episode.aid,
@@ -928,7 +943,8 @@ fun VideoInfoData(
     var heightIs by remember { mutableStateOf(0.dp) }
     val isLogin by remember { mutableStateOf(Prefs.isLogin) }
     var coverHasFocus by remember { mutableStateOf(false) }
-    val videoDuration = videoDetail.pages.sumOf { it.duration }.takeIf { videoDetail.pages.isNotEmpty() } ?: 0
+    val videoDuration =
+        videoDetail.pages.sumOf { it.duration }.takeIf { videoDetail.pages.isNotEmpty() } ?: 0
 
     Row(
         modifier = modifier
@@ -980,7 +996,7 @@ fun VideoInfoData(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(28.dp)
                         .padding(bottom = 2.dp, start = 2.dp, end = 2.dp)
                         .clip(
                             RoundedCornerShape(
@@ -1000,7 +1016,7 @@ fun VideoInfoData(
                         )
                 ) {
                     CoverBottomInfo(
-                        play = if (videoDetail.stat.view >= 10000) "${videoDetail.stat.view / 10000}万" else "$videoDetail.stat.view",
+                        play = if (videoDetail.stat.view >= 10000) "${videoDetail.stat.view / 10000}万" else "${videoDetail.stat.view}",
                         time = (videoDuration * 1000L).formatMinSec()
                     )
                 }
@@ -1025,7 +1041,9 @@ fun VideoInfoData(
                     color = Color.White
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
@@ -1067,14 +1085,14 @@ fun VideoInfoData(
                             onAddToDefaultFavoriteFolder = onAddToDefaultFavoriteFolder,
                             onUpdateFavoriteFolders = onUpdateFavoriteFolders
                         )
-                       CoinButton(
-                           modifier = Modifier
-                               .height(32.dp), // 设置高度
-                           isCoin = isCoin,
-                           onAddCoin = {
+                        CoinButton(
+                            modifier = Modifier
+                                .height(32.dp), // 设置高度
+                            isCoin = isCoin,
+                            onAddCoin = {
                                 onAddCoin()
-                           }
-                       )
+                            }
+                        )
                     }
                     UpButton(
                         name = videoDetail.author.name,
@@ -1159,7 +1177,7 @@ private fun UpButton(
             UpIcon(color = Color.White)
             Text(text = name, color = Color.White)
         }
-        if(isLogin && showFollowButton) {
+        if (isLogin && showFollowButton) {
             Row(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
@@ -1823,7 +1841,7 @@ private fun CoverBottomInfo(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(12.dp, 8.dp),
+            .padding(12.dp, 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
