@@ -173,10 +173,10 @@ fun ControllerVideoInfoBottom(
             Text(
                 modifier = Modifier
                     .padding(horizontal = 32.dp)
-                    .fillMaxWidth(0.75f),
+                    .fillMaxWidth(if (seekData.duration>60*60*1000) 0.75f else 0.85f),
                 text = if (partTitle.isEmpty() || title == partTitle) title else partTitle,
                 color = Color.White,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 style = if (partTitle.isEmpty() || title == partTitle) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
             )
@@ -252,7 +252,7 @@ private fun ControllerVideoInfoPreview() {
 
     CompositionLocalProvider(
         LocalVideoPlayerSeekData provides VideoPlayerSeekData(
-            duration = 100,
+            duration = 10000,
             position = 33,
             bufferedPercentage = 66
         ),
