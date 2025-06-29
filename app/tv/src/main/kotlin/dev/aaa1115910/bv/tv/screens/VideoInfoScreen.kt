@@ -139,7 +139,7 @@ import dev.aaa1115910.bv.util.fDebug
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.fWarn
 import dev.aaa1115910.bv.util.focusedBorder
-import dev.aaa1115910.bv.util.formatMinSec
+import dev.aaa1115910.bv.util.formatHourMinSec
 import dev.aaa1115910.bv.util.formatPubTimeString
 import dev.aaa1115910.bv.util.ifElse
 import dev.aaa1115910.bv.util.onBackPressed
@@ -1002,7 +1002,7 @@ fun VideoInfoData(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .padding(bottom = 10.dp, end = 16.dp),
-                        text = (videoDuration * 1000L).formatMinSec(),
+                        text = (videoDuration * 1000L).formatHourMinSec(),
                         color = Color.White,
                         style = MaterialTheme.typography.bodySmall
                     )

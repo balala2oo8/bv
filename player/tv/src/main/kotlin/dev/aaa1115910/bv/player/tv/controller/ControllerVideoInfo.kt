@@ -48,7 +48,7 @@ import dev.aaa1115910.bv.player.entity.VideoPlayerSeekThumbData
 import dev.aaa1115910.bv.player.entity.VideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.seekbar.SeekMoveState
 import dev.aaa1115910.bv.player.tv.VideoSeekBar
-import dev.aaa1115910.bv.util.formatMinSec
+import dev.aaa1115910.bv.util.formatHourMinSec
 
 @Composable
 fun ControllerVideoInfo(
@@ -182,7 +182,7 @@ fun ControllerVideoInfoBottom(
             )
             Text(
                 modifier = Modifier.padding(top = 8.dp, bottom = 0.dp, end = 32.dp),
-                text = "${seekData.position.formatMinSec()} / ${seekData.duration.formatMinSec()}",
+                text = "${seekData.position.formatHourMinSec()} / ${seekData.duration.formatHourMinSec()}",
                 color = Color.White
             )
         }
