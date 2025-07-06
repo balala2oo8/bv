@@ -2,9 +2,11 @@ package dev.aaa1115910.bv.tv.screens
 
 import android.app.Activity
 import android.content.res.Configuration
+import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +42,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -86,6 +90,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Glow
@@ -126,6 +131,7 @@ import dev.aaa1115910.bv.tv.activities.video.SeasonInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.TagActivity
 import dev.aaa1115910.bv.tv.activities.video.UpInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.VideoInfoActivity
+import dev.aaa1115910.bv.tv.component.LoadingTip
 import dev.aaa1115910.bv.tv.component.TvAlertDialog
 import dev.aaa1115910.bv.tv.component.UpIcon
 import dev.aaa1115910.bv.tv.component.buttons.LikeButton
@@ -157,6 +163,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.getKoin
 import kotlin.math.ceil
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun VideoInfoScreen(
     modifier: Modifier = Modifier,
@@ -183,7 +190,7 @@ fun VideoInfoScreen(
     var lastPlayedCid by remember { mutableLongStateOf(0) }
     var lastPlayedTime by remember { mutableIntStateOf(0) }
 
-    var tip by remember { mutableStateOf("加载中...") }
+    var tip by remember { mutableStateOf("Loading") }
     var showUGCVideoInfo by remember { mutableStateOf(Prefs.showUGCVideoInfo) }
     var fromSeason by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
@@ -572,20 +579,24 @@ fun VideoInfoScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                modifier = Modifier.align(Alignment.Center),
-                text = tip,
-                fontSize = 18.sp
-            )
+            if (tip == "Loading") {
+                LoadingTip()
+            }else{
+                Text(
+                    text = tip,
+                    fontSize = 20.sp
+                )
+            }
         }
     } else {
         Scaffold(
-            containerColor = Color.Black
+            modifier = modifier
         ) { innerPadding ->
             Box(
-                modifier.padding(innerPadding)
+                Modifier.padding(innerPadding)
             ) {
                 Image(
                     modifier = Modifier.fillMaxSize(),
@@ -959,18 +970,22 @@ fun VideoInfoData(
             glow = ClickableSurfaceDefaults.glow(
                 focusedGlow = Glow(
                     elevationColor = MaterialTheme.colorScheme.inverseSurface,
-                    elevation = 16.dp
+                    elevation = 12.dp
+                )
+            ),
+            border = ClickableSurfaceDefaults.border(
+                focusedBorder = Border(
+                    border = BorderStroke(
+                        width = 2.dp,
+                        color = MaterialTheme.colorScheme.border
+                    ),
+                    shape = MaterialTheme.shapes.large
                 )
             )
         ) {
             AsyncImage(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .border(
-                        width = if (coverHasFocus) 2.dp else 0.dp,
-                        color = if (coverHasFocus) Color.White else Color.Transparent,
-                        shape = MaterialTheme.shapes.large
-                    ),
+                    .fillMaxSize(),
                 // model = if (videoDetail.ugcSeason != null) videoDetail.ugcSeason!!.cover else videoDetail.cover,
                 model = videoDetail.cover,
                 contentDescription = null,
@@ -982,7 +997,6 @@ fun VideoInfoData(
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .height(48.dp)
-                        .padding(bottom = 2.dp, start = 2.dp, end = 2.dp)
                         .clip(
                             RoundedCornerShape(
                                 topStart = 0.dp,
