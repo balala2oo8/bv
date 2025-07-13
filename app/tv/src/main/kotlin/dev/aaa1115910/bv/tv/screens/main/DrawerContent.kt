@@ -52,6 +52,7 @@ import dev.aaa1115910.bv.util.ifElse
 import dev.aaa1115910.bv.util.isDpadRight
 import dev.aaa1115910.bv.util.isKeyDown
 import dev.aaa1115910.bv.util.onDelayFocusChanged
+import kotlinx.coroutines.delay
 
 // 创建全局的FocusRequester映射表，方便外部使用
 val drawerItemFocusRequesters = mutableMapOf<DrawerItem, FocusRequester>().apply {
@@ -82,9 +83,15 @@ fun DrawerContent(
     var focusedItem by remember { mutableStateOf(DrawerItem.Home) }
 
     var focusOnContent by remember { mutableStateOf(true) }
+    var tabMoved by remember { mutableStateOf(true) }
 
     LaunchedEffect(selectedItem) {
+        tabMoved = false
+        delay(200)
         onDrawerItemChanged(selectedItem)
+        // 别急着向右移动焦点，动画还没结束
+        delay(200)
+        tabMoved = true
     }
 
     LaunchedEffect(focusedItem) {
@@ -98,7 +105,7 @@ fun DrawerContent(
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.isDpadRight()) {
                     if (keyEvent.isKeyDown()) {
-                        onFocusToContent()
+                        if (tabMoved) onFocusToContent()
                         return@onPreviewKeyEvent true
                     }
                 }
