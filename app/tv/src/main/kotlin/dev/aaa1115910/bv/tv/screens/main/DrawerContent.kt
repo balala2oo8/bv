@@ -116,7 +116,7 @@ fun DrawerContent(
                     drawerItemFocusRequesters[focusedItem]?.requestFocus()
                 }
             }
-            .onDelayFocusChanged(delayTime = 50) {
+            .onDelayFocusChanged(delayTime = 0) {
                 focusOnContent = !it.hasFocus
             },
         verticalArrangement = Arrangement.SpaceBetween
@@ -195,10 +195,9 @@ fun DrawerContent(
                                     focusedItem = item
                                 }
                             }
-                            // 延迟更新selectedItem以延迟右侧内容的切换
-                            .onDelayFocusChanged {
+                            .onFocusChanged {
                                 if (it.hasFocus) {
-                                    selectedItem = focusedItem
+                                    selectedItem = item
                                 }
                             },
                         onClick = {

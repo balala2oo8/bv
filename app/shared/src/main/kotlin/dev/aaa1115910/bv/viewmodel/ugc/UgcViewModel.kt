@@ -96,7 +96,9 @@ abstract class UgcViewModel(
         loadJob?.cancel()
         loadJob = viewModelScope.launch(Dispatchers.IO) {
             delay(delayMs)
-            initUgcRegionData()
+            if (ugcItems.isEmpty()) {
+                initUgcRegionData()
+            }
         }
     }
 
