@@ -35,7 +35,7 @@ android {
             buildConfigField(
                 type = "String",
                 name = "APPLICATION_ID",
-                value = "\"${AppConfiguration.appId}\""
+                value = "\"${AppConfiguration.applicationId}\""
             )
             buildConfigField(
                 type = "String",
