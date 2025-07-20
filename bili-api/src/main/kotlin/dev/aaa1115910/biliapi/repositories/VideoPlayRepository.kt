@@ -211,8 +211,15 @@ class VideoPlayRepository(
                     cid = cid,
                     sessData = authRepository.sessionData ?: ""
                 ).getResponseData()
-                response.subtitle.subtitles
-                    .map { Subtitle.fromSubtitleItem(it) }
+
+                if (response.subtitle == null) {
+                    println("get subtitle failed")
+                } else {
+                    println("get subtitle success")
+                }
+                response.subtitle?.subtitles
+                    ?.map { Subtitle.fromSubtitleItem(it) }
+                    ?: emptyList()
             }
 
             ApiType.App -> {
