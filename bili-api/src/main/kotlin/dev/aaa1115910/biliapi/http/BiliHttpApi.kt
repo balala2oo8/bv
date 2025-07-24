@@ -121,7 +121,7 @@ object BiliHttpApi {
         val data: T,
         var expireTime: Long
     )
-    
+
     private val videoMoreInfoCache = ConcurrentHashMap<String, CacheEntry<BiliResponse<VideoMoreInfo>>>()
 
     init {
@@ -656,7 +656,7 @@ object BiliHttpApi {
     ): BiliResponse<VideoMoreInfo> {
         val cacheKey = "$avid-$cid-$sessData"
         val currentTime = System.currentTimeMillis()
-        
+
         // 清理所有过期的缓存数据
         val iterator = videoMoreInfoCache.entries.iterator()
         while (iterator.hasNext()) {
@@ -665,23 +665,23 @@ object BiliHttpApi {
                 iterator.remove()
             }
         }
-        
+
         videoMoreInfoCache[cacheKey]?.let { cacheEntry ->
             // 缓存存在且有效，重置TTL并返回缓存结果
             cacheEntry.expireTime = currentTime + 1000L
             return cacheEntry.data
         }
-        
+
         // 发起请求
         val response: BiliResponse<VideoMoreInfo> = client.get("/x/player/wbi/v2") {
             parameter("aid", avid)
             parameter("cid", cid)
             header("Cookie", "SESSDATA=$sessData;")
         }.body()
-        
+
         // 缓存结果
         videoMoreInfoCache[cacheKey] = CacheEntry(response, currentTime + 1000L)
-        
+
         return response
     }
 
@@ -1328,13 +1328,13 @@ object BiliHttpApi {
             // parameter("platform", "pc")
         }
 
-         return try {
-             response.body()
-         } catch (e: Exception) {
-             val responseText = response.bodyAsText()
-             println("searchType 序列化失败，原始响应内容: $responseText")
-             throw e
-         }
+        return try {
+            response.body()
+        } catch (e: Exception) {
+            val responseText = response.bodyAsText()
+            println("searchType 序列化失败，原始响应内容: $responseText")
+            throw e
+        }
     }
 
     /** 获取番剧首页数据 */
