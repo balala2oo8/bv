@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -178,10 +179,11 @@ fun VideoInfoScreen(
     val intent = (context as Activity).intent
     val logger = KotlinLogging.logger { }
     val defaultFocusRequester = remember { FocusRequester() }
+    val lazyListState = rememberLazyListState()
 
     var showFollowButton by remember { mutableStateOf(false) }
     var isFollowing by remember { mutableStateOf(false) }
-
+    
     // 添加用于管理简介对话框的状态
     var showDescriptionDialog by remember { mutableStateOf(false) }
 
@@ -609,6 +611,26 @@ fun VideoInfoScreen(
                     alpha = 0.6f
                 )
                 LazyColumn(
+                    modifier = Modifier
+                        .focusable()
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown) {
+                                when (event.key) {
+                                    Key.DirectionUp -> {
+                                        scope.launch {
+                                            lazyListState.animateScrollBy(-200f)
+                                        }
+                                    }
+                                    Key.DirectionDown -> {
+                                        scope.launch {
+                                            lazyListState.animateScrollBy(200f)
+                                        }
+                                    }
+                                }
+                            }
+                            return@onKeyEvent false
+                        },
+                    state = lazyListState,
                     contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -845,7 +867,7 @@ fun VideoInfoScreen(
                         }
                     }
                     if (videoDetailViewModel.relatedVideos.isNotEmpty()) {
-                        item {
+                        item { 
                             VideosRow(
                                 header = stringResource(R.string.video_info_related_video_title),
                                 videos = videoDetailViewModel.relatedVideos,
@@ -1398,7 +1420,10 @@ fun VideoPartRow(
     val titleColor = if (hasFocus) Color.White else Color.White.copy(alpha = 0.6f)
     val titleFontSize by animateFloatAsState(
         targetValue = if (hasFocus) 30f else 14f,
-        label = "title font size"
+        label = "title font size",
+        animationSpec = tween(
+            durationMillis = 250
+        )
     )
 
     Column(
@@ -1470,7 +1495,10 @@ fun VideoUgcSeasonRow(
     val titleColor = if (hasFocus) Color.White else Color.White.copy(alpha = 0.6f)
     val titleFontSize by animateFloatAsState(
         targetValue = if (hasFocus) 30f else 14f,
-        label = "title font size"
+        label = "title font size",
+        animationSpec = tween(
+            durationMillis = 250
+        )
     )
     var focusingEpisode by remember { mutableStateOf<Episode?>(null) }
 
