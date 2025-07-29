@@ -219,7 +219,7 @@ fun CardCover(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.6f),
-            model = cover.resizedImageUrl(ImageSize.Cover),
+            model = cover.resizedImageUrl(ImageSize.SmallVideoCardCover),
             contentDescription = null,
             contentScale = ContentScale.Crop
         )
