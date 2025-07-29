@@ -470,7 +470,7 @@ fun VideoInfoScreen(
 
                     videoInfoRepository.relatedVideos.clear()
                     if (!fromSeason) {
-                        videoInfoRepository.relatedVideos.addAll(videoDetailViewModel.relatedVideos)
+                        videoInfoRepository.relatedVideos.addAll(videoDetailViewModel.relatedVideos.subList(0, videoDetailViewModel.relatedVideos.size.takeIf { it<12 } ?: 12))
                     }
                     // 从播放器推荐视频打开时 fromPlayer=true 并显示loading。300m后 fromPlayer改成false，此后从播放器返回详情页，正常显示详情内容
                     //如果是从剧集跳转过来的或设置不显示视频详情，就直接播放 P1
@@ -958,7 +958,7 @@ fun ArgueTip(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = 36.dp),
         colors = SurfaceDefaults.colors(
             containerColor = Color.Yellow.copy(alpha = 0.2f),
             contentColor = Color.Yellow
@@ -1009,24 +1009,24 @@ fun VideoInfoData(
     onAddCoin: () -> Unit = {},
     onShowDescription: () -> Unit = {}
 ) {
-    val localDensity = LocalDensity.current
-    var heightIs by remember { mutableStateOf(0.dp) }
+//    val localDensity = LocalDensity.current
+//    var heightIs by remember { mutableStateOf(0.dp) }
     val isLogin by remember { mutableStateOf(Prefs.isLogin) }
     var coverHasFocus by remember { mutableStateOf(false) }
     val videoDuration = videoDetail.pages.sumOf { it.duration }.takeIf { videoDetail.pages.isNotEmpty() } ?: 0
 
     Row(
         modifier = modifier
-            .padding(horizontal = 32.dp, vertical = 16.dp),
+            .padding(horizontal = 36.dp, vertical = 16.dp),
     ) {
         Surface(
             modifier = Modifier
                 .focusRequester(defaultFocusRequester)
-                .weight(3f)
+                .width(240.dp)
                 .aspectRatio(1.6f)
-                .onGloballyPositioned { coordinates ->
-                    heightIs = with(localDensity) { coordinates.size.height.toDp() }
-                }
+//                .onGloballyPositioned { coordinates ->
+//                    heightIs = with(localDensity) { coordinates.size.height.toDp() }
+//                }
                 .onFocusChanged { coverHasFocus = it.hasFocus }
                 .padding(4.dp)
                 .shadow(
@@ -1128,8 +1128,8 @@ fun VideoInfoData(
         Spacer(modifier = Modifier.width(24.dp))
         Column(
             modifier = Modifier
-                .weight(7f)
-                .height(heightIs),
+                .fillMaxWidth(),
+//                .height(heightIs),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // 基本信息
@@ -1211,8 +1211,9 @@ fun VideoInfoData(
                                 .clip(MaterialTheme.shapes.small)
                                 .background(Color.White.copy(alpha = 0.2f))
                                 .focusedBorder(MaterialTheme.shapes.small)
-                                .padding(horizontal = 4.dp, vertical = 3.dp)
-                                .clickable { onShowDescription() },
+                                .padding(horizontal = 4.dp)
+                                .clickable { onShowDescription() }
+                                .height(32.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -1481,7 +1482,7 @@ fun VideoPartRow(
 
     Column(
         modifier = modifier
-            .ifElse(!nested, Modifier.padding(start = 20.dp))
+            .ifElse(!nested, Modifier.padding(start = 24.dp))
             .onFocusChanged { hasFocus = it.hasFocus },
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -1559,7 +1560,7 @@ fun VideoUgcSeasonRow(
 
     Column(
         modifier = modifier
-            .padding(start = 20.dp)
+            .padding(start = 24.dp)
             .onFocusChanged { hasFocus = it.hasFocus },
         verticalArrangement = Arrangement.SpaceBetween
     ) {

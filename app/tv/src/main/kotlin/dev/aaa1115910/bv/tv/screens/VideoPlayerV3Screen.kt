@@ -78,7 +78,10 @@ fun VideoPlayerV3Screen(
     // 当显示相关视频时，自动将焦点转移到VideosRow的第一个卡片
     LaunchedEffect(showRelatedVideos) {
         if (showRelatedVideos) {
-            relatedVideosFocusRequester.requestFocus()
+            delay(300)
+            kotlin.runCatching {
+                relatedVideosFocusRequester.requestFocus()
+            }
         }
     }
     

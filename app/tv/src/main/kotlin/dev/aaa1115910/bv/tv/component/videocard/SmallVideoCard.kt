@@ -158,7 +158,7 @@ private fun CoverBottomInfo(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(12.dp, 8.dp),
+            .padding(10.dp, 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (play.isNotBlank()) {
@@ -219,7 +219,7 @@ fun CardCover(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.6f),
-            model = cover.resizedImageUrl(ImageSize.SmallVideoCardCover),
+            model = cover.resizedImageUrl(ImageSize.Cover),
             contentDescription = null,
             contentScale = ContentScale.Crop
         )
