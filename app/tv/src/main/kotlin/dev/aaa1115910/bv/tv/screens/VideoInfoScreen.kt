@@ -479,6 +479,14 @@ fun VideoInfoScreen(
                     if (fromSeason || !showUGCVideoInfo || fromPlayer) {
                         val playPart = videoDetailViewModel.videoDetail!!.pages.first()
                         cid = cid.takeIf { it > 0L } ?: playPart.cid
+
+                        if (videoDetailViewModel.videoDetail!!.ugcSeason !== null) {
+                            val sectionIndex =
+                                videoDetailViewModel.videoDetail!!.ugcSeason!!.sections
+                                    .indexOfFirst { section -> section.episodes.any { it.cid == cid } }
+                            updateUgcSeasonSectionVideoList(sectionIndex)
+                        }
+
                         launchPlayerActivity(
                             context = context,
                             avid = videoDetailViewModel.videoDetail!!.aid,
@@ -495,6 +503,7 @@ fun VideoInfoScreen(
                             play = videoDetailViewModel.videoDetail!!.stat.view,
                             danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                             upName = videoDetailViewModel.videoDetail!!.author.name,
+                            upId = videoDetailViewModel.videoDetail!!.author.mid,
                             pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                         )
                         if(fromPlayer) {
@@ -749,6 +758,7 @@ fun VideoInfoScreen(
                                     play = videoDetailViewModel.videoDetail!!.stat.view,
                                     danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                     upName = videoDetailViewModel.videoDetail!!.author.name,
+                                    upId = videoDetailViewModel.videoDetail!!.author.mid,
                                     pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                 )
                             },
@@ -860,6 +870,7 @@ fun VideoInfoScreen(
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
+                                        upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 }
@@ -894,6 +905,7 @@ fun VideoInfoScreen(
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
+                                        upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 },
@@ -916,6 +928,7 @@ fun VideoInfoScreen(
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
+                                        upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 }
