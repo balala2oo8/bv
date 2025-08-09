@@ -57,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,6 +140,7 @@ import dev.aaa1115910.bv.tv.component.buttons.CoinButton
 import dev.aaa1115910.bv.tv.component.buttons.FavoriteButton
 import dev.aaa1115910.bv.tv.component.videocard.VideosRow
 import dev.aaa1115910.bv.tv.util.launchPlayerActivity
+import dev.aaa1115910.bv.tv.util.FollowStateManager
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fDebug
@@ -186,6 +188,18 @@ fun VideoInfoScreen(
     var showFollowButton by remember { mutableStateOf(false) }
     var isFollowing by remember { mutableStateOf(false) }
     
+    // 监听关注状态变化
+    val followStateMap by FollowStateManager.followStateMap.collectAsState()
+    
+    // 当关注状态map变化时，更新当前用户的关注状态
+    LaunchedEffect(followStateMap, videoDetailViewModel.videoDetail?.author?.mid) {
+        videoDetailViewModel.videoDetail?.author?.mid?.let { mid ->
+            FollowStateManager.getFollowState(mid)?.let { following ->
+                isFollowing = following
+            }
+        }
+    }
+    
     // 添加用于管理简介对话框的状态
     var showDescriptionDialog by remember { mutableStateOf(false) }
 
@@ -231,6 +245,18 @@ fun VideoInfoScreen(
     val updateFollowingState: () -> Unit = {
         scope.launch(Dispatchers.IO) {
             val userMid = videoDetailViewModel.videoDetail?.author?.mid ?: -1
+            
+            // 先检查缓存中是否有关注状态
+            val cachedState = FollowStateManager.getFollowState(userMid)
+            if (cachedState != null) {
+                withContext(Dispatchers.Main) {
+                    showFollowButton = true
+                    isFollowing = cachedState
+                }
+                return@launch
+            }
+            
+            // 缓存中没有，调用API获取
             logger.fInfo { "Checking is following user $userMid" }
             val success = userRepository.checkIsFollowing(
                 mid = userMid,
@@ -239,7 +265,11 @@ fun VideoInfoScreen(
             logger.fInfo { "Following user result: $success" }
             withContext(Dispatchers.Main) {
                 showFollowButton = success != null
-                isFollowing = success == true
+                if (success != null) {
+                    isFollowing = success
+                    // 更新到缓存中
+                    FollowStateManager.updateFollowState(userMid, success)
+                }
             }
         }
     }
@@ -253,6 +283,10 @@ fun VideoInfoScreen(
                 preferApiType = Prefs.apiType
             )
             logger.fInfo { "Add follow result: $success" }
+            // 更新缓存状态
+            if (success) {
+                FollowStateManager.updateFollowState(userMid, true)
+            }
             afterModify(success)
         }
     }
@@ -266,6 +300,10 @@ fun VideoInfoScreen(
                 preferApiType = Prefs.apiType
             )
             logger.fInfo { "Del follow result: $success" }
+            // 更新缓存状态
+            if (success) {
+                FollowStateManager.updateFollowState(userMid, false)
+            }
             afterModify(success)
         }
     }
@@ -504,6 +542,7 @@ fun VideoInfoScreen(
                             danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                             upName = videoDetailViewModel.videoDetail!!.author.name,
                             upId = videoDetailViewModel.videoDetail!!.author.mid,
+                            upFace = videoDetailViewModel.videoDetail!!.author.face,
                             pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                         )
                         if(fromPlayer) {
@@ -759,6 +798,7 @@ fun VideoInfoScreen(
                                     danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                     upName = videoDetailViewModel.videoDetail!!.author.name,
                                     upId = videoDetailViewModel.videoDetail!!.author.mid,
+                                    upFace = videoDetailViewModel.videoDetail!!.author.face,
                                     pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                 )
                             },
@@ -766,17 +806,26 @@ fun VideoInfoScreen(
                                 UpInfoActivity.actionStart(
                                     context,
                                     mid = videoDetailViewModel.videoDetail!!.author.mid,
-                                    name = videoDetailViewModel.videoDetail!!.author.name
+                                    name = videoDetailViewModel.videoDetail!!.author.name,
+                                    face = videoDetailViewModel.videoDetail!!.author.face
                                 )
                             },
                             onAddFollow = {
-                                addFollow {
-                                    updateFollowingState()
+                                addFollow { success ->
+                                    if (success) {
+                                        "关注成功".toast(context)
+                                    } else {
+                                        "关注失败".toast(context)
+                                    }
                                 }
                             },
                             onDelFollow = {
-                                delFollow {
-                                    updateFollowingState()
+                                delFollow { success ->
+                                    if (success) {
+                                        "已取消关注".toast(context)
+                                    } else {
+                                        "取消关注失败".toast(context)
+                                    }
                                 }
                             },
                             onClickTip = { tag ->
@@ -871,6 +920,7 @@ fun VideoInfoScreen(
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
+                                        upFace = videoDetailViewModel.videoDetail!!.author.face,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 }
@@ -906,6 +956,7 @@ fun VideoInfoScreen(
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
+                                        upFace = videoDetailViewModel.videoDetail!!.author.face,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 },
@@ -929,6 +980,7 @@ fun VideoInfoScreen(
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
+                                        upFace = videoDetailViewModel.videoDetail!!.author.face,
                                         pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                                     )
                                 }
