@@ -165,15 +165,7 @@ fun DrawerContent(
                         tint = if (!focusOnContent && focusedItem == DrawerItem.User) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
                     )
                 }
-            },
-            label = { Text(
-                modifier = Modifier.offset(y = (-3).dp),
-                text = if (isLogin) username
-                else DrawerItem.User.displayName,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall
-            ) }
+            }
         )
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
@@ -214,13 +206,6 @@ fun DrawerContent(
                                 contentDescription = null,
                                 tint = if (!focusOnContent && focusedItem == item) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
                             )
-                        },
-                        label = {
-                            Text(
-                                modifier = Modifier.offset(y = (-3).dp),
-                                text = item.displayName,
-                                style = MaterialTheme.typography.bodySmall
-                            )
                         }
                     )
                 }
@@ -245,13 +230,6 @@ fun DrawerContent(
                     imageVector = DrawerItem.Settings.displayIcon,
                     contentDescription = null,
                     tint = if (!focusOnContent && focusedItem == DrawerItem.Settings) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
-                )
-            },
-            label = {
-                Text(
-                    modifier = Modifier.offset(y = (-3).dp),
-                    text = DrawerItem.Settings.displayName,
-                    style = MaterialTheme.typography.bodySmall
                 )
             }
         )
