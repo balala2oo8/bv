@@ -48,7 +48,7 @@ jobs:
         run: |
           echo ${{ secrets.SIGN_KEY }} > ./encoded_key
           mkdir -p android
-          base64 -d encoded_key > android/key.jks
+          cat encoded_key | base64 --decode > android/key.jks
 
       - name: Build apk
         run: ./gradlew assembleDefaultAlpha assembleDefaultDebug
