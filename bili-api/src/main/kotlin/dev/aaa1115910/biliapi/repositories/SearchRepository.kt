@@ -320,7 +320,8 @@ data class SearchTypeResult(
         val duration: Int,
         val play: Int,
         val danmaku: Int,
-        val pubTime: Int
+        val pubTime: Int,
+        val pubDate: Int
     ) : SearchTypeResultItem {
         companion object {
             fun fromSearchVideoResult(video: dev.aaa1115910.biliapi.http.entity.search.SearchVideoResult) =
@@ -333,7 +334,8 @@ data class SearchTypeResult(
                     duration = convertStringTimeToSeconds(video.duration),
                     play = video.play,
                     danmaku = video.danmaku,
-                    pubTime = video.pubDate
+                    pubTime = video.pubDate,
+                    pubDate = video.pubDate
                 )
 
             fun fromSearchVideoCard(video: bilibili.polymer.app.search.v1.Item) =
@@ -346,7 +348,8 @@ data class SearchTypeResult(
                     duration = convertStringTimeToSeconds(video.av.duration),
                     play = video.av.play,
                     danmaku = video.av.danmaku,
-                    pubTime = 0
+                    pubTime = video.av.ptime,
+                    pubDate = video.av.ptime
                 )
         }
     }

@@ -153,7 +153,9 @@ fun BvPlayerController(
                 onCloseMenu = { isMenuOpen = false }
             ) {
                 Box(
-                    modifier = Modifier.clip(RoundedCornerShape(0.dp))
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(0.dp))
                 ) {
                     content()
                 }
@@ -513,7 +515,7 @@ private fun BvPlayerControllerSettingsContent(
     MaterialTheme(colorScheme = colorScheme) {
         Surface(
             modifier = modifier,
-            shape = MaterialTheme.shapes.large.copy(
+            shape = MaterialTheme.shapes.medium.copy(
                 topEnd = CornerSize(0),
                 bottomEnd = CornerSize(0)
             ),

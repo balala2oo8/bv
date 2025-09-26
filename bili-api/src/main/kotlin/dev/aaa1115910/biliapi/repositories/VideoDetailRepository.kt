@@ -99,7 +99,8 @@ class VideoDetailRepository(
                         val videoModeInfo = BiliHttpApi.getVideoMoreInfo(
                             avid = aid,
                             cid = videoDetailWithoutUserActions.cid,
-                            sessData = authRepository.sessionData ?: ""
+                            sessData = authRepository.sessionData ?: "",
+                            buvid3 = authRepository.buvid3 ?: ""
                         ).getResponseData()
                         val history = VideoDetail.History(
                             progress = videoModeInfo.lastPlayTime / 1000,
@@ -175,7 +176,8 @@ class VideoDetailRepository(
                     val videoModeInfo = BiliHttpApi.getVideoMoreInfo(
                         avid = firstEp.aid,
                         cid = firstEp.cid,
-                        sessData = authRepository.sessionData ?: ""
+                        sessData = authRepository.sessionData ?: "",
+                        buvid3 = authRepository.buvid3 ?: ""
                     ).getResponseData()
                     val playerIcon = VideoDetail.PlayerIcon.fromPlayerIcon(videoModeInfo.playerIcon)
                     playerIcon

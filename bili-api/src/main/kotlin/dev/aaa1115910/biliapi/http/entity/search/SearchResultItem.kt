@@ -383,7 +383,7 @@ data class SearchVideoResult(
     val title: String,
     val description: String,
     @SerialName("arcrank")
-    val arcRank: String? = "",
+    val arcRank: String? = null,
     val pic: String,
     val play: Int,
     @SerialName("video_review")

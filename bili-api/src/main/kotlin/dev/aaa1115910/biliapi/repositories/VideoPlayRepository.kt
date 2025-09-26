@@ -209,7 +209,8 @@ class VideoPlayRepository(
                 val response = BiliHttpApi.getVideoMoreInfo(
                     avid = aid,
                     cid = cid,
-                    sessData = authRepository.sessionData ?: ""
+                    sessData = authRepository.sessionData ?: "",
+                    buvid3 = authRepository.buvid3 ?: ""
                 ).getResponseData()
 
                 if (response.subtitle == null) {
@@ -284,7 +285,8 @@ class VideoPlayRepository(
                 val response = BiliHttpApi.getVideoMoreInfo(
                     avid = aid,
                     cid = cid,
-                    sessData = authRepository.sessionData ?: ""
+                    sessData = authRepository.sessionData ?: "",
+                    buvid3 = authRepository.buvid3 ?: ""
                 ).getResponseData()
                 response.dmMask?.maskUrl
             }

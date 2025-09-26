@@ -2,12 +2,16 @@ package dev.aaa1115910.bv.tv.screens.main
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -22,13 +26,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +50,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
@@ -50,6 +61,7 @@ import coil.compose.AsyncImage
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.isDpadRight
 import dev.aaa1115910.bv.util.isKeyDown
+import dev.aaa1115910.bv.util.onDelayFocusChanged
 import dev.aaa1115910.bv.util.onDelayFocusChanged
 import kotlinx.coroutines.delay
 
@@ -64,7 +76,19 @@ val drawerItemFocusRequesters = mutableMapOf<DrawerItem, FocusRequester>().apply
 // 用于记住每个内容页当前选中的Tab
 val currentSelectedTabs = mutableStateMapOf<DrawerItem, Int>()
 
+// 创建全局的FocusRequester映射表，方便外部使用
+val drawerItemFocusRequesters = mutableMapOf<DrawerItem, FocusRequester>().apply {
+    DrawerItem.entries.filter { it != DrawerItem.User && it != DrawerItem.Settings }
+        .forEach { item ->
+            this[item] = FocusRequester()
+        }
+}
+
+// 用于记住每个内容页当前选中的Tab
+val currentSelectedTabs = mutableStateMapOf<DrawerItem, Int>()
+
 @Composable
+fun DrawerContent(
 fun DrawerContent(
     modifier: Modifier = Modifier,
     isLogin: Boolean = false,
@@ -72,12 +96,17 @@ fun DrawerContent(
     username: String = "",
     onDrawerItemChanged: (DrawerItem) -> Unit = {},
     onDrawerItemfocused: (DrawerItem) -> Unit = {},
+    onDrawerItemfocused: (DrawerItem) -> Unit = {},
     onOpenSettings: () -> Unit = {},
     onShowUserPanel: () -> Unit = {},
     onFocusToContent: () -> Unit = {},
     onLogin: () -> Unit = {}
 ) {
     var selectedItem by remember { mutableStateOf(DrawerItem.Home) }
+    // 添加一个新的状态用于即时跟踪获得焦点的项目
+    var focusedItem by remember { mutableStateOf(DrawerItem.Home) }
+
+    var focusOnContent by remember { mutableStateOf(true) }
     // 添加一个新的状态用于即时跟踪获得焦点的项目
     var focusedItem by remember { mutableStateOf(DrawerItem.Home) }
 
@@ -97,8 +126,14 @@ fun DrawerContent(
         onDrawerItemfocused(focusedItem)
     }
 
+    LaunchedEffect(focusedItem) {
+        onDrawerItemfocused(focusedItem)
+    }
+
     Column(
         modifier = modifier
+            .fillMaxSize()
+            .padding(4.dp)
             .fillMaxSize()
             .padding(4.dp)
             .onPreviewKeyEvent { keyEvent ->
@@ -117,9 +152,24 @@ fun DrawerContent(
             }
             .onDelayFocusChanged(delayTime = 0) {
                 focusOnContent = !it.hasFocus
+            }
+            .onFocusChanged {
+                if (it.hasFocus) {
+                    drawerItemFocusRequesters[focusedItem]?.requestFocus()
+                }
+            }
+            .onDelayFocusChanged(delayTime = 0) {
+                focusOnContent = !it.hasFocus
             },
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        NavigationRailItem(
+            modifier = Modifier
+                .onFocusChanged {
+                    if (it.hasFocus && !focusOnContent) {
+                        focusedItem = DrawerItem.User
+                    }
+                },
         NavigationRailItem(
             modifier = Modifier
                 .onFocusChanged {
@@ -134,7 +184,13 @@ fun DrawerContent(
                     onLogin()
                 }
                 focusedItem = DrawerItem.User
+                focusedItem = DrawerItem.User
             },
+            selected = focusedItem == DrawerItem.User,
+            colors = NavigationRailItemDefaults.colors(
+                indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
+            ),
+            icon = {
             selected = focusedItem == DrawerItem.User,
             colors = NavigationRailItemDefaults.colors(
                 indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
@@ -169,6 +225,7 @@ fun DrawerContent(
         )
         LazyColumn(
             verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)
         ) {
             listOf(
                 DrawerItem.Search,
@@ -178,7 +235,30 @@ fun DrawerContent(
             ).forEach { item ->
                 item {
                     NavigationRailItem(
+                    NavigationRailItem(
                         modifier = Modifier
+                            .focusRequester(drawerItemFocusRequesters[item]!!)
+                            // 立即更新focusedItem以反映视觉状态
+                            .onFocusChanged {
+                                if (it.hasFocus && !focusOnContent) {
+                                    focusedItem = item
+                                }
+                            }
+                            .onFocusChanged {
+                                if (it.hasFocus) {
+                                    selectedItem = item
+                                }
+                            },
+                        onClick = {
+                            selectedItem = item
+                            focusedItem = item
+                        },
+                        // 使用focusedItem来决定视觉状态
+                        selected = focusedItem == item,
+                        colors = NavigationRailItemDefaults.colors(
+                            indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
+                        ),
+                        icon = {
                             .focusRequester(drawerItemFocusRequesters[item]!!)
                             // 立即更新focusedItem以反映视觉状态
                             .onFocusChanged {
@@ -226,8 +306,25 @@ fun DrawerContent(
                 indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
             ),
             icon = {
+        NavigationRailItem(
+            modifier = Modifier.onFocusChanged {
+                if (it.hasFocus && !focusOnContent) {
+                    focusedItem = DrawerItem.Settings
+                }
+            },
+            onClick = {
+                onOpenSettings()
+                focusedItem = DrawerItem.Settings
+            },
+            selected = focusedItem == DrawerItem.Settings,
+            colors = NavigationRailItemDefaults.colors(
+                indicatorColor = if (focusOnContent) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.inverseSurface
+            ),
+            icon = {
                 Icon(
                     imageVector = DrawerItem.Settings.displayIcon,
+                    contentDescription = null,
+                    tint = if (!focusOnContent && focusedItem == DrawerItem.Settings) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
                     contentDescription = null,
                     tint = if (!focusOnContent && focusedItem == DrawerItem.Settings) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.inverseSurface
                 )
@@ -251,6 +348,7 @@ enum class DrawerItem(
 @Preview(device = "id:tv_1080p")
 @Composable
 private fun DrawerContentPreview() {
+private fun DrawerContentPreview() {
     BVTheme {
         Box(
             modifier = Modifier
@@ -263,7 +361,20 @@ private fun DrawerContentPreview() {
                     .width(72.dp),
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow
             ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .width(180.dp)
+        ) {
+            NavigationRail(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(72.dp),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
                 DrawerContent()
+            }
+        }
             }
         }
     }
