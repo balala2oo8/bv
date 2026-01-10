@@ -45,18 +45,20 @@ import dev.aaa1115910.biliapi.entity.video.SubtitleType
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
+import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.VideoPlayerMenuNavItem
+import dev.aaa1115910.bv.player.entity.VideoRotation
 import dev.aaa1115910.bv.player.tv.controller.playermenu.ClosedCaptionMenuList
 import dev.aaa1115910.bv.player.tv.controller.playermenu.DanmakuMenuList
 import dev.aaa1115910.bv.player.tv.controller.playermenu.MenuNavList
+import dev.aaa1115910.bv.player.tv.controller.playermenu.OthersMenuList
 import dev.aaa1115910.bv.player.tv.controller.playermenu.PictureMenuList
 import dev.aaa1115910.bv.util.requestFocus
 import dev.aaa1115910.bv.util.swapList
-import kotlinx.coroutines.delay
 
 @Composable
 fun MenuController(
@@ -65,6 +67,7 @@ fun MenuController(
     onResolutionChange: (Resolution) -> Unit = {},
     onCodecChange: (VideoCodec) -> Unit = {},
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
+    onRotationChange: (VideoRotation) -> Unit,
     onPlaySpeedChange: (Float) -> Unit = {},
     onAudioChange: (Audio) -> Unit,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
@@ -75,7 +78,8 @@ fun MenuController(
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
-    onSubtitleBottomPadding: (Dp) -> Unit
+    onSubtitleBottomPadding: (Dp) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val defaultFocusRequester = remember { FocusRequester() }
@@ -98,6 +102,7 @@ fun MenuController(
                 onResolutionChange = onResolutionChange,
                 onCodecChange = onCodecChange,
                 onAspectRatioChange = onAspectRatioChange,
+                onRotationChange = onRotationChange,
                 onPlaySpeedChange = onPlaySpeedChange,
                 onAudioChange = onAudioChange,
                 onDanmakuSwitchChange = onDanmakuSwitchChange,
@@ -108,7 +113,8 @@ fun MenuController(
                 onSubtitleChange = onSubtitleChange,
                 onSubtitleSizeChange = onSubtitleSizeChange,
                 onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
-                onSubtitleBottomPadding = onSubtitleBottomPadding
+                onSubtitleBottomPadding = onSubtitleBottomPadding,
+                onPlayModeChange = onPlayModeChange
             )
         }
     }
@@ -121,6 +127,7 @@ fun MenuController(
     onResolutionChange: (Resolution) -> Unit = {},
     onCodecChange: (VideoCodec) -> Unit = {},
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
+    onRotationChange: (VideoRotation) -> Unit,
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
@@ -131,7 +138,8 @@ fun MenuController(
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
-    onSubtitleBottomPadding: (Dp) -> Unit
+    onSubtitleBottomPadding: (Dp) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit
 ) {
     var selectedNavItem by remember { mutableStateOf(VideoPlayerMenuNavItem.Picture) }
     var focusState by remember { mutableStateOf(MenuFocusState.MenuNav) }
@@ -158,6 +166,7 @@ fun MenuController(
                     onCodecChange = onCodecChange,
                     onPlaySpeedChange = onPlaySpeedChange,
                     onAspectRatioChange = onAspectRatioChange,
+                    onRotationChange = onRotationChange,
                     onAudioChange = onAudioChange,
                     onDanmakuSwitchChange = onDanmakuSwitchChange,
                     onDanmakuSizeChange = onDanmakuSizeChange,
@@ -168,7 +177,8 @@ fun MenuController(
                     onSubtitleChange = onSubtitleChange,
                     onSubtitleSizeChange = onSubtitleSizeChange,
                     onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
-                    onSubtitleBottomPadding = onSubtitleBottomPadding
+                    onSubtitleBottomPadding = onSubtitleBottomPadding,
+                    onPlayModeChange = onPlayModeChange
                 )
                 MenuNavList(
                     modifier = Modifier
@@ -199,6 +209,7 @@ private fun MenuList(
     onResolutionChange: (Resolution) -> Unit,
     onCodecChange: (VideoCodec) -> Unit,
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
+    onRotationChange: (VideoRotation) -> Unit,
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
@@ -210,6 +221,7 @@ private fun MenuList(
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit
 ) {
     Box(
@@ -222,6 +234,7 @@ private fun MenuList(
                     onResolutionChange = onResolutionChange,
                     onCodecChange = onCodecChange,
                     onAspectRatioChange = onAspectRatioChange,
+                    onRotationChange = onRotationChange,
                     onPlaySpeedChange = onPlaySpeedChange,
                     onAudioChange = onAudioChange,
                     onFocusStateChange = onFocusStateChange
@@ -248,6 +261,13 @@ private fun MenuList(
                     onFocusStateChange = onFocusStateChange
                 )
             }
+
+//            VideoPlayerMenuNavItem.Others -> {
+//                OthersMenuList(
+//                    onPlayModeChange = onPlayModeChange,
+//                    onFocusStateChange = onFocusStateChange
+//                )
+//            }
         }
     }
 }
@@ -261,6 +281,7 @@ fun MenuControllerPreview() {
     var currentResolution by remember { mutableStateOf(Resolution.R240P) }
     var currentCodec by remember { mutableStateOf(VideoCodec.HEVC) }
     var currentVideoAspectRatio by remember { mutableStateOf(VideoAspectRatio.Default) }
+    var currentVideoRotation by remember { mutableStateOf(VideoRotation.Original) }
     var currentPlaySpeed by remember { mutableFloatStateOf(1f) }
     var currentAudio by remember { mutableStateOf(Audio.A192K) }
 
@@ -275,6 +296,8 @@ fun MenuControllerPreview() {
     var currentSubtitleFontSize by remember { mutableStateOf(24.sp) }
     var currentSubtitleBackgroundOpacity by remember { mutableFloatStateOf(0.4f) }
     var currentSubtitleBottomPadding by remember { mutableStateOf(8.dp) }
+
+    var currentPlayMode by remember { mutableStateOf(PlayMode.Sequential) }
 
     LaunchedEffect(Unit) {
         currentSubtitleList.apply {
@@ -337,6 +360,7 @@ fun MenuControllerPreview() {
                         currentResolution = currentResolution,
                         currentVideoCodec = currentCodec,
                         currentVideoAspectRatio = currentVideoAspectRatio,
+                        currentVideoRotation = currentVideoRotation,
                         currentVideoSpeed = currentPlaySpeed,
                         currentAudio = currentAudio,
 
@@ -350,7 +374,9 @@ fun MenuControllerPreview() {
                         availableSubtitleTracks = currentSubtitleList,
                         currentSubtitleFontSize = currentSubtitleFontSize,
                         currentSubtitleBackgroundOpacity = currentSubtitleBackgroundOpacity,
-                        currentSubtitleBottomPadding = currentSubtitleBottomPadding
+                        currentSubtitleBottomPadding = currentSubtitleBottomPadding,
+
+                        currentPlayMode = currentPlayMode
                     )
                 ) {
                     MenuController(
@@ -360,6 +386,7 @@ fun MenuControllerPreview() {
                         onResolutionChange = { currentResolution = it },
                         onCodecChange = { currentCodec = it },
                         onAspectRatioChange = { currentVideoAspectRatio = it },
+                        onRotationChange = { currentVideoRotation = it },
                         onPlaySpeedChange = { currentPlaySpeed = it },
                         onAudioChange = { currentAudio = it },
                         onDanmakuSwitchChange = {
@@ -379,7 +406,8 @@ fun MenuControllerPreview() {
                         onSubtitleBackgroundOpacityChange = {
                             currentSubtitleBackgroundOpacity = it
                         },
-                        onSubtitleBottomPadding = { currentSubtitleBottomPadding = it }
+                        onSubtitleBottomPadding = { currentSubtitleBottomPadding = it },
+                        onPlayModeChange = { currentPlayMode = it }
                     )
                 }
             }

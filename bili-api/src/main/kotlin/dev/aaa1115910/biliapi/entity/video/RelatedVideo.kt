@@ -12,9 +12,10 @@ data class RelatedVideo(
     val author: Author?,
     val jumpToSeason: Boolean,
     val epid: Int?,
-    val view: Int,
+    val view: Long,
     val danmaku: Int,
-    val pubTime: String? = null
+    val pubTime: String? = null,
+    val isChargingArchive: Boolean = false
 ) {
     companion object {
         fun fromRelate(relate: bilibili.app.view.v1.Relate) = RelatedVideo(
@@ -42,7 +43,8 @@ data class RelatedVideo(
                 epid = null,
                 view = relate.stat.view,
                 danmaku = relate.stat.danmaku,
-                pubTime = relate.pubdate.toLong().toSmartDate()
+                pubTime = relate.pubdate.toLong().toSmartDate(),
+                isChargingArchive = relate.isChargingArchive || relate.chargingPay != null
             )
     }
 }

@@ -41,8 +41,11 @@ class VideoPlayerV3Activity : ComponentActivity() {
             proxyArea: ProxyArea = ProxyArea.MainLand,
             playerIconIdle: String = "",
             playerIconMoving: String = "",
-            play: Int = 0,
+            play: Long = 0,
             danmaku: Int = 0,
+            like: Int = 0,
+            coin: Int = 0,
+            favorite: Int = 0,
             upName: String = "",
             upId: Long = 0L,
             upFace: String = "",
@@ -81,6 +84,9 @@ class VideoPlayerV3Activity : ComponentActivity() {
                     putExtra("playerIconMoving", playerIconMoving)
                     putExtra("play", play)
                     putExtra("danmaku", danmaku)
+                    putExtra("like", like)
+                    putExtra("coin", coin)
+                    putExtra("favorite", favorite)
                     putExtra("upName", upName)
                     putExtra("upId", upId)
                     putExtra("upFace", upFace)
@@ -137,8 +143,8 @@ class VideoPlayerV3Activity : ComponentActivity() {
         dev.aaa1115910.bv.tv.activities.video.VideoPlayerV3Activity.Companion.logger.info { "Init video player: ${Prefs.playerType.name}" }
         val options = VideoPlayerOptions(
             userAgent = when (Prefs.apiType) {
-                ApiType.Web -> getString(R.string.video_player_user_agent_http)
-                ApiType.App -> getString(R.string.video_player_user_agent_client)
+                ApiType.Web -> dev.aaa1115910.biliapi.BiliApiConstants.USER_AGENT_WEB
+                ApiType.App -> dev.aaa1115910.biliapi.BiliApiConstants.USER_AGENT_APP
             },
             referer = when (Prefs.apiType) {
                 ApiType.Web -> getString(R.string.video_player_referer)
@@ -172,8 +178,11 @@ class VideoPlayerV3Activity : ComponentActivity() {
             val proxyArea = ProxyArea.entries[intent.getIntExtra("proxy_area", 0)]
             val playerIconIdle = intent.getStringExtra("playerIconIdle") ?: ""
             val playerIconMoving = intent.getStringExtra("playerIconMoving") ?: ""
-            val play = intent.getIntExtra("play", 0)
+            val play = intent.getLongExtra("play", 0)
             val danmaku = intent.getIntExtra("danmaku", 0)
+            val like = intent.getIntExtra("like", 0)
+            val coin = intent.getIntExtra("coin", 0)
+            val favorite = intent.getIntExtra("favorite", 0)
             val upName = intent.getStringExtra("upName") ?: ""
             val upId = intent.getLongExtra("upId", 0)
             val upFace = intent.getStringExtra("upFace") ?: ""
@@ -198,6 +207,9 @@ class VideoPlayerV3Activity : ComponentActivity() {
                 this.playerIconMoving = playerIconMoving
                 this.play = play
                 this.danmaku = danmaku
+                this.like = like
+                this.coin = coin
+                this.favorite = favorite
                 this.upName = upName
                 this.upId = upId
                 this.upFace = upFace

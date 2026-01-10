@@ -128,7 +128,8 @@ class SearchRepository(
                         tid = tid,
                         order = order.httpOrderParam,
                         duration = duration.httpDurationParam,
-                        buvid3 = authRepository.buvid3!!,
+                        sessData = authRepository.sessionData,
+                        buvid3 = authRepository.buvid3,
                     )
                 } else {
                     BiliHttpApi.searchType(
@@ -138,7 +139,8 @@ class SearchRepository(
                         tid = tid,
                         order = order.httpOrderParam,
                         duration = duration.httpDurationParam,
-                        buvid3 = authRepository.buvid3!!,
+                        sessData = authRepository.sessionData,
+                        buvid3 = authRepository.buvid3,
                     )
                 }.getResponseData()
                 SearchTypeResult.fromSearchTypeResult(response)
@@ -318,7 +320,7 @@ data class SearchTypeResult(
         val cover: String,
         val author: String,
         val duration: Int,
-        val play: Int,
+        val play: Long,
         val danmaku: Int,
         val pubTime: Int,
         val pubDate: Int

@@ -1,13 +1,14 @@
 package dev.aaa1115910.biliapi.http
 
+import dev.aaa1115910.biliapi.BiliApiConstants
 import dev.aaa1115910.biliapi.http.entity.BiliResponse
 import dev.aaa1115910.biliapi.http.entity.search.SearchResultData
 import dev.aaa1115910.biliapi.http.entity.video.PlayUrlData
+import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
 import dev.aaa1115910.biliapi.http.util.encApiSign
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.BrowserUserAgent
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -30,7 +31,7 @@ object BiliHttpProxyApi {
 
     fun createClient(proxyServer: String) {
         client = HttpClient(OkHttp) {
-            BrowserUserAgent()
+            BiliUserAgent()
             install(ContentNegotiation) {
                 json(json)
             }
@@ -77,7 +78,8 @@ object BiliHttpProxyApi {
         supportMultiAudio: Boolean? = null,
         drmTechType: Int? = null,
         fromClient: String? = null,
-        sessData: String? = null
+        sessData: String? = null,
+        dedeUserID: Long? = null
     ): BiliResponse<PlayUrlData> = client?.get("/pgc/player/web/playurl") {
         require(av != null || bv != null) { "av and bv cannot be null at the same time" }
         require(epid != null || cid != null) { "epid and cid cannot be null at the same time" }
@@ -93,7 +95,7 @@ object BiliHttpProxyApi {
         supportMultiAudio?.let { parameter("support_multi_audio", it) }
         drmTechType?.let { parameter("drm_tech_type", it) }
         fromClient?.let { parameter("from_client", it) }
-        sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+        sessData?.let { header("Cookie", "SESSDATA=$sessData;DedeUserID=$dedeUserID") }
         //必须得加上 referer 才能通过账号身份验证
         header("referer", "https://www.bilibili.com")
     }?.body() ?: throw IllegalStateException("no proxy server")
@@ -108,6 +110,7 @@ object BiliHttpProxyApi {
         tid: Int? = null,
         order: String? = null,
         duration: Int? = null,
+        sessData: String? = null,
         buvid3: String? = null
     ): BiliResponse<SearchResultData> = client?.get("/x/web-interface/wbi/search/type") {
         parameter("keyword", keyword)
@@ -116,6 +119,11 @@ object BiliHttpProxyApi {
         tid?.let { parameter("tids", it) }
         order?.let { parameter("order", it) }
         duration?.let { parameter("duration", it) }
-        header("Cookie", "buvid3=$buvid3;")
+        if (sessData != null) {
+            header("Cookie", "SESSDATA=$sessData;buvid3=$buvid3;")
+        } else {
+            header("Cookie", "buvid3=$buvid3;")
+        }
+        header("referer", "https://search.bilibili.com/")
     }?.body() ?: throw IllegalStateException("no proxy server")
 }

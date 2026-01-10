@@ -27,7 +27,9 @@ data class VideoDetail(
     val tags: List<Tag>,
     val userActions: UserActions,
     var history: History,
-    var playerIcon: PlayerIcon? = null
+    var playerIcon: PlayerIcon? = null,
+    var isChargingArc: Boolean = false,
+    var chargingArcBadge: String = ""
 ) {
     companion object {
         fun fromViewReply(viewReply: ViewReply): VideoDetail {
@@ -111,12 +113,16 @@ data class VideoDetail(
                 tags = videoDetail.tags.map { Tag.fromTag(it) },
                 userActions = UserActions(),
                 history = History(0, 0),
-                playerIcon = null
+                playerIcon = null,
+                isChargingArc = videoDetail.view.isUpowerExclusive,
+                chargingArcBadge = if (videoDetail.view.isUpowerExclusive) {
+                    if (videoDetail.view.isUpowerPlay) "限时免费" else "充电专属"
+                } else ""
             )
     }
 
     data class Stat(
-        val view: Int,
+        val view: Long,
         val danmaku: Int,
         val reply: Int,
         val favorite: Int,

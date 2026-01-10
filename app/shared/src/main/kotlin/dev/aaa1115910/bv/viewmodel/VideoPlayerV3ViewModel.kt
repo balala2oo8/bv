@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kuaishou.akdanmaku.data.DanmakuItemData
-import com.kuaishou.akdanmaku.render.DanmakuRenderer
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.entity.PlayData
@@ -31,13 +30,18 @@ import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
 import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
 import dev.aaa1115910.bv.player.renderer.OptimizedTextRenderer
+import dev.aaa1115910.bv.player.renderer.SimpleRenderer
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.entity.PlayMode
+import dev.aaa1115910.bv.player.entity.PortraitVideoFixMode
 import dev.aaa1115910.bv.player.entity.RequestState
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
+import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.VideoRotation
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fError
@@ -113,6 +117,7 @@ class VideoPlayerV3ViewModel(
     var currentVideoCodec by mutableStateOf(Prefs.defaultVideoCodec)
     var currentPlaySpeed by mutableFloatStateOf(Prefs.currentPlaySpeed)
     var currentVideoAspectRatio by mutableStateOf(VideoAspectRatio.Default)
+    var currentVideoRotation by mutableStateOf(VideoRotation.Original)
     var currentAudio by mutableStateOf(Prefs.defaultAudio)
     var currentDanmakuScale by mutableFloatStateOf(Prefs.defaultDanmakuScale)
     var currentDanmakuOpacity by mutableFloatStateOf(Prefs.defaultDanmakuOpacity)
@@ -128,6 +133,8 @@ class VideoPlayerV3ViewModel(
     var currentSubtitleBackgroundOpacity by mutableFloatStateOf(Prefs.defaultSubtitleBackgroundOpacity)
     var currentSubtitleBottomPadding by mutableStateOf(Prefs.defaultSubtitleBottomPadding)
 
+    var currentPlayMode by mutableStateOf(Prefs.defaultPlayMode)
+
     var title by mutableStateOf("")
     var partTitle by mutableStateOf("")
     var lastPlayed by mutableIntStateOf(0)
@@ -137,8 +144,11 @@ class VideoPlayerV3ViewModel(
     var seasonId by mutableIntStateOf(0)
     var isVerticalVideo by mutableStateOf(false)
     var proxyArea by mutableStateOf(ProxyArea.MainLand)
-    var play by mutableStateOf(0)
+    var play by mutableLongStateOf(0)
     var danmaku by mutableStateOf(0)
+    var like by mutableStateOf(0)
+    var coin by mutableStateOf(0)
+    var favorite by mutableStateOf(0)
     var upName by mutableStateOf("")
     var upFace by mutableStateOf("")
     var pubTime by mutableStateOf("")
@@ -146,6 +156,7 @@ class VideoPlayerV3ViewModel(
     var isLoop by mutableStateOf(Prefs.isLoop)
     var showDanmaku by mutableStateOf(Prefs.showDanmaku)
     var showRelatedVideos by mutableStateOf(false)
+    var isFollowingUp by mutableStateOf(false)
 
     var needPay by mutableStateOf(false)
 
@@ -162,7 +173,8 @@ class VideoPlayerV3ViewModel(
 
     private suspend fun ensureDanmakuPlayer() = withContext(Dispatchers.Main) {
         danmakuPlayer?.release()
-        danmakuPlayer = DanmakuPlayer(OptimizedTextRenderer.createHighPerformance())
+        danmakuPlayer = DanmakuPlayer(SimpleRenderer())
+        // danmakuPlayer = DanmakuPlayer(OptimizedTextRenderer.createHighPerformance())
         logger.fInfo { "(Re)create DanmakuPlayer" }
     }
 
@@ -283,7 +295,11 @@ class VideoPlayerV3ViewModel(
             availableAudio.swapListWithMainContext(audioList)
 
             // 确定使用哪个默认分辨率
-            val defaultQualityToUse = if (isVerticalVideo && Prefs.portraitVideoQualityLimitMax1080P && Prefs.defaultQuality >= Resolution.R4K) {
+            val defaultQualityToUse = if (
+                isVerticalVideo &&
+                Prefs.portraitVideoFixMode == PortraitVideoFixMode.LimitResolution1080P &&
+                Prefs.defaultQuality >= Resolution.R4K
+            ) {
                 // 如果是竖屏视频且用户设置了竖屏视频限制最高使用1080P
                 Resolution.R1080P60
             } else {
@@ -667,10 +683,10 @@ class VideoPlayerV3ViewModel(
         }
 
         if (!Prefs.preferOfficialCdn) {
-            // 当用户不偏好官方 CDN 时，使用加权随机：官方权重 0.8，非官方权重 1.3（基准为 1）
+            // 当用户不偏好官方 CDN 时，使用加权随机：官方权重 0.8，非官方权重 1.2（基准为 1）
             logger.fInfo { "doesn't need to filter official cdn url, select a weighted random url (favor non-official)" }
 
-            val weights = urls.map { url -> if (isOfficialCdn(url)) 0.8 else 1.3 }
+            val weights = urls.map { url -> if (isOfficialCdn(url)) 0.8 else 1.2 }
             val total = weights.sum()
             // 如果权重计算异常，退回随机
             if (total <= 0.0) return urls.randomOrNull() ?: ""
@@ -720,6 +736,72 @@ class VideoPlayerV3ViewModel(
             logger.fInfo { "Load video shot success" }
         }.onFailure {
             logger.fWarn { "Load video shot failed: ${it.stackTraceToString()}" }
+        }
+    }
+
+    fun playNextVideo() {
+        logger.fInfo { "Video finished" }
+        when (currentPlayMode) {
+            PlayMode.Single -> {
+                logger.info { "Play mode: $currentPlayMode, do nothing" }
+            }
+
+            PlayMode.Sequential -> {
+                logger.info { "Play mode: $currentPlayMode, play next video in list" }
+                playNextVideoInList()
+            }
+
+            PlayMode.SingleLoop -> {
+                logger.info { "Play mode: $currentPlayMode, replay current video" }
+                danmakuPlayer?.seekTo(0L)
+                danmakuPlayer?.pause()
+                videoPlayer?.seekTo(0L)
+            }
+
+            PlayMode.ListLoop -> {
+                logger.info { "Play mode: $currentPlayMode, play next video in list or loop to first" }
+                playNextVideoInList(loop = true)
+            }
+        }
+    }
+
+    private fun playNextVideoInList(loop: Boolean = false) {
+        val currentIndex = availableVideoList
+            .indexOfFirst {
+                when (it) {
+                    is VideoListItemData -> it.cid == currentCid
+                    else -> false
+                }
+            }
+        if (currentIndex + 1 < availableVideoList.size) {
+            val nextVideos = availableVideoList.subList(
+                currentIndex + 1,
+                availableVideoList.size
+            )
+            val nextVideo =
+                nextVideos.firstOrNull { it is VideoListItemData }!! as VideoListItemData
+            logger.info { "Play next video: $nextVideo" }
+            partTitle = nextVideo.title
+            loadPlayUrl(
+                avid = nextVideo.aid,
+                cid = nextVideo.cid!!,
+                epid = nextVideo.epid,
+                seasonId = nextVideo.seasonId,
+                continuePlayNext = true
+            )
+        } else if (loop) {
+            //loop to first
+            val firstVideo =
+                availableVideoList.firstOrNull { it is VideoListItemData }!! as VideoListItemData
+            logger.info { "Loop to first video: $firstVideo" }
+            partTitle = firstVideo.title
+            loadPlayUrl(
+                avid = firstVideo.aid,
+                cid = firstVideo.cid!!,
+                epid = firstVideo.epid,
+                seasonId = firstVideo.seasonId,
+                continuePlayNext = true
+            )
         }
     }
 }

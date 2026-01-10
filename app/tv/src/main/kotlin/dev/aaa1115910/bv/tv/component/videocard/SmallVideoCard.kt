@@ -1,9 +1,6 @@
 package dev.aaa1115910.bv.tv.component.videocard
 
 import android.content.res.Configuration
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -31,9 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,8 +41,8 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import dev.aaa1115910.bv.R
-import dev.aaa1115910.bv.tv.component.UpIcon
 import dev.aaa1115910.bv.entity.carddata.VideoCardData
+import dev.aaa1115910.bv.tv.component.UpIcon
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.ImageSize
 import dev.aaa1115910.bv.util.ifElse
@@ -64,59 +59,51 @@ fun SmallVideoCard(
 ) {
     var hasFocus by remember { mutableStateOf(initialFocus) }
 
-    // 缓存密度计算，避免重复计算
-    val finalOffsetY = LocalDensity.current.run { 5.dp.toPx() }
-    val infoOffsetY by animateFloatAsState(
-        targetValue = if (hasFocus) finalOffsetY else 0f,
-        animationSpec = tween(
-            durationMillis = 120
-        ),
-        label = "info offset y"
-    )
-
-    Surface (
+    Surface(
         modifier = modifier
             .fillMaxWidth()
             .onFocusChanged {
                 hasFocus = it.isFocused
                 if (hasFocus) onFocus()
-            },
+            }
+            .ifElse(
+                hasFocus,
+                Modifier.border(
+                    width = 2.dp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                    shape = MaterialTheme.shapes.medium
+                )
+            ),
         onClick = onClick,
         onLongClick = onLongClick,
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
-            focusedContainerColor = Color.Transparent,
-            pressedContainerColor = Color.Transparent
+            focusedContainerColor = if (hasFocus) MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f) else Color.Transparent,
+            pressedContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
         ),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
         scale = ClickableSurfaceDefaults.scale(scale = 1f, focusedScale = 1f)
     ) {
         Column(
             modifier = modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(top = 3.dp, start = 3.dp, end = 3.dp),
         ) {
             CardCover(
                 modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .ifElse(hasFocus, Modifier
-                        .border (
-                            border = BorderStroke(width = 3.dp, color = MaterialTheme.colorScheme.border),
-                            shape = MaterialTheme.shapes.medium
-                        )
-                    ),
+                    .clip(MaterialTheme.shapes.medium),
                 cover = data.cover,
                 play = data.playString,
                 danmaku = data.danmakuString,
-                time = data.timeString
+                time = data.timeString,
+                badge = "${if(data.isChargingArc) "⚡" else ""}${if(data.badgeText.isEmpty() && data.isChargingArc) "充电专属" else data.badgeText}"
             )
             Spacer(modifier = Modifier.height(8.dp))
             CardInfo(
                 modifier = Modifier
-                    .graphicsLayer {
-                        translationY = infoOffsetY
-                    }
                     .fillMaxWidth()
-                    .height(80.dp),
+                    .height(79.dp)
+                    .padding(horizontal = 1.dp),
                 title = data.title,
                 upName = data.upName,
                 pubTime = data.pubTime
@@ -151,7 +138,7 @@ private fun CoverBottomInfo(
                 color = Color.White
             )
         }
-        
+
         if (danmaku.isNotBlank()) {
             if (play.isNotBlank()) Spacer(Modifier.width(8.dp))
             Icon(
@@ -166,7 +153,7 @@ private fun CoverBottomInfo(
                 color = Color.White
             )
         }
-        
+
         Spacer(Modifier.weight(1f))
         Text(
             text = time,
@@ -183,7 +170,8 @@ fun CardCover(
     cover: String,
     play: String,
     danmaku: String,
-    time: String
+    time: String,
+    badge: String = ""
 ) {
     BoxWithConstraints(
         modifier = modifier,
@@ -199,6 +187,22 @@ fun CardCover(
             contentDescription = null,
             contentScale = ContentScale.Crop
         )
+        // 封面与徽章叠放，徽章绝对定位在右上角
+        if (badge.isNotEmpty()) {
+            Text(
+                modifier = Modifier
+                    .padding(5.dp)
+                    .align(Alignment.TopEnd)
+                    .background(
+                        color = Color.Black.copy(0.3f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    )
+                    .padding(vertical = 1.dp, horizontal = 2.dp),
+                text = badge,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White
+            )
+        }
         // 只有需要显示时才创建阴影和信息组件
         if (showInfo) {
             Box(
@@ -214,7 +218,7 @@ fun CardCover(
                         )
                     )
             )
-            
+
             CoverBottomInfo(
                 play = play,
                 danmaku = danmaku,
@@ -231,7 +235,7 @@ private fun CardInfo(
     upName: String,
     pubTime: String?
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier) {
         Text(
             modifier = Modifier,
             text = title,
@@ -242,20 +246,24 @@ private fun CardInfo(
         )
         Spacer(modifier = Modifier.height(4.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            UpIcon()
-            Text(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 2.dp),
-                text = upName,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            if (upName.isNotEmpty()) {
+                UpIcon()
+                Text(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 2.dp),
+                    text = upName,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             pubTime?.let {
                 Text(
                     text = it,
@@ -280,7 +288,8 @@ fun SmallVideoCardWithoutFocusPreview() {
         play = 2333,
         danmaku = 666,
         time = 2333 * 1000,
-        pubTime = "3小时前"
+        pubTime = "3小时前",
+        isChargingArc = true
     )
     BVTheme {
         Surface(

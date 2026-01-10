@@ -8,8 +8,10 @@ data class VideoCardData(
     val title: String,
     val cover: String,
     val upName: String,
+    val upId: Long = 0,
+    val upFace: String = "",
     val reason: String = "",
-    val play: Int? = null,
+    val play: Long? = null,
     var playString: String = "",
     val danmaku: Int? = null,
     var danmakuString: String = "",
@@ -19,6 +21,8 @@ data class VideoCardData(
     val epId: Int? = null,
     val pubTime: String? = null,
     // var pubTimeString: String = "",
+    val isChargingArc: Boolean = false,
+    val badgeText: String = ""
 ) {
     init {
         play?.let {

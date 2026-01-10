@@ -83,7 +83,10 @@ class VideoDetailViewModel(
                 danmaku = it.danmaku,
                 jumpToSeason = it.jumpToSeason,
                 epId = it.epid,
-                pubTime = it.pubTime
+                pubTime = it.pubTime,
+                upId = it.author?.mid ?: 0,
+                upFace = it.author?.face ?: "",
+                isChargingArc = it.isChargingArchive
             )
         } ?: emptyList()
         relatedVideos.swapListWithMainContext(relateVideoCardDataList)

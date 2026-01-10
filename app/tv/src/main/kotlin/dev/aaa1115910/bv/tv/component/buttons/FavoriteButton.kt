@@ -1,7 +1,6 @@
 package dev.aaa1115910.bv.tv.component.buttons
 
 import android.content.res.Configuration
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -34,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonBorder
 import androidx.tv.material3.ButtonColors
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -46,6 +46,7 @@ import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.tv.component.TvAlertDialog
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.swapList
+import kotlinx.coroutines.delay
 
 @Composable
 fun FavoriteButton(
@@ -57,6 +58,7 @@ fun FavoriteButton(
     onUpdateFavoriteFolders: (List<Long>) -> Unit,
     contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 6.dp), // 减小内边距
     colors: ButtonColors = ButtonDefaults.colors(),
+    border: ButtonBorder = ButtonDefaults.border(),
     onDialogVisibilityChanged: (Boolean) -> Unit = {},
     dialogContainerColor: Color = AlertDialogDefaults.containerColor
 ) {
@@ -70,6 +72,7 @@ fun FavoriteButton(
         modifier = modifier,
         contentPadding = contentPadding,
         colors = colors,
+        border = border,
         shape = ButtonDefaults.shape(shape = RoundedCornerShape(8.dp)), // 设置为小圆角
         onClick = {
             if (showFavoriteDialog) return@Button
@@ -128,11 +131,23 @@ private fun FavoriteDialog(
 ) {
     val selectedFavoriteFolderIds = remember { mutableStateListOf<Long>() }
     val defaultFocusRequester = remember { FocusRequester() }
+    var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+    fun touch() { lastInteractionTime = System.currentTimeMillis() }
 
     LaunchedEffect(show) {
         if (show) {
             selectedFavoriteFolderIds.swapList(favoriteFolderIds)
             defaultFocusRequester.requestFocus()
+            // 打开时更新交互时间
+            touch()
+        }
+    }
+    // 15 秒无操作自动关闭
+    LaunchedEffect(lastInteractionTime, show) {
+        if (show) {
+            val base = lastInteractionTime
+            delay(15000)
+            if (base == lastInteractionTime) onHideDialog()
         }
     }
 
@@ -161,7 +176,10 @@ private fun FavoriteDialog(
                             else Modifier
 
                         FilterChip(
-                            modifier = itemModifier.onFocusChanged { hasFocus = it.hasFocus },
+                            modifier = itemModifier.onFocusChanged {
+                                hasFocus = it.hasFocus
+                                if (it.hasFocus) touch()
+                            },
                             selected = selected,
                             onClick = {
                                 if (selectedFavoriteFolderIds.contains(userFavoriteFolder.id)) {
@@ -170,10 +188,12 @@ private fun FavoriteDialog(
                                     selectedFavoriteFolderIds.add(userFavoriteFolder.id)
                                 }
                                 onUpdateFavoriteFolders(selectedFavoriteFolderIds)
+                                // 点击交互更新最后交互时间
+                                touch()
                             },
                             leadingIcon = {
                                 Row {
-                                    AnimatedVisibility(visible = selected) {
+                                    if(selected) {
                                         Icon(
                                             modifier = Modifier.size(20.dp),
                                             imageVector = Icons.Rounded.Done,

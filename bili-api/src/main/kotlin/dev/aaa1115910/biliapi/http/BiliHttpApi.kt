@@ -3,6 +3,7 @@ package dev.aaa1115910.biliapi.http
 import com.tfowl.ktor.client.plugins.JsoupPlugin
 import dev.aaa1115910.biliapi.entity.pgc.PgcType
 import dev.aaa1115910.biliapi.http.BiliHttpApi.getRegionDynamic
+import dev.aaa1115910.biliapi.BiliApiConstants.USER_AGENT_WEB
 import dev.aaa1115910.biliapi.http.entity.BiliResponse
 import dev.aaa1115910.biliapi.http.entity.BiliResponseWithoutData
 import dev.aaa1115910.biliapi.http.entity.danmaku.DanmakuData
@@ -51,6 +52,7 @@ import dev.aaa1115910.biliapi.http.entity.user.favorite.UserFavoriteFoldersData
 import dev.aaa1115910.biliapi.http.entity.user.garb.Equip
 import dev.aaa1115910.biliapi.http.entity.user.garb.EquipPart
 import dev.aaa1115910.biliapi.http.entity.video.AddCoin
+import dev.aaa1115910.biliapi.http.entity.video.ArchiveRelation
 import dev.aaa1115910.biliapi.http.entity.video.CheckSentCoin
 import dev.aaa1115910.biliapi.http.entity.video.CheckVideoFavoured
 import dev.aaa1115910.biliapi.http.entity.video.PlayUrlData
@@ -68,13 +70,14 @@ import dev.aaa1115910.biliapi.http.entity.video.VideoInfo
 import dev.aaa1115910.biliapi.http.entity.video.VideoMoreInfo
 import dev.aaa1115910.biliapi.http.entity.video.VideoShot
 import dev.aaa1115910.biliapi.http.entity.web.NavResponseData
+import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
 import dev.aaa1115910.biliapi.http.util.BiliAppConf
 import dev.aaa1115910.biliapi.http.util.encApiSign
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.BrowserUserAgent
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -134,7 +137,9 @@ object BiliHttpApi {
 
     private fun createClient() {
         client = HttpClient(OkHttp) {
-            BrowserUserAgent()
+            install(UserAgent) {
+                agent = USER_AGENT_WEB
+            }
             install(ContentNegotiation) {
                 json(json)
             }
@@ -211,7 +216,8 @@ object BiliHttpApi {
         otype: String = "json",
         type: String = "",
         platform: String = "oc",
-        sessData: String? = null
+        sessData: String? = null,
+        dedeUserID: Long? = null
     ): BiliResponse<PlayUrlData> = client.get("/x/player/playurl") {
         require(av != null || bv != null) { "av and bv cannot be null at the same time" }
         parameter("avid", av)
@@ -225,7 +231,7 @@ object BiliHttpApi {
         parameter("otype", otype)
         parameter("type", type)
         parameter("platform", platform)
-        sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+        sessData?.let { header("Cookie", "SESSDATA=$sessData;DedeUserID=$dedeUserID") }
     }.body()
 
     /**
@@ -244,7 +250,8 @@ object BiliHttpApi {
         supportMultiAudio: Boolean? = null,
         drmTechType: Int? = null,
         fromClient: String? = null,
-        sessData: String? = null
+        sessData: String? = null,
+        dedeUserID: Long? = null
     ): BiliResponse<PlayUrlData> = client.get("/pgc/player/web/playurl") {
         require(av != null || bv != null) { "av and bv cannot be null at the same time" }
         require(epid != null || cid != null) { "epid and cid cannot be null at the same time" }
@@ -260,7 +267,7 @@ object BiliHttpApi {
         supportMultiAudio?.let { parameter("support_multi_audio", it) }
         drmTechType?.let { parameter("drm_tech_type", it) }
         fromClient?.let { parameter("from_client", it) }
-        sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+        sessData?.let { header("Cookie", "SESSDATA=$sessData;DedeUserID=$dedeUserID") }
         //必须得加上 referer 才能通过账号身份验证
         header("referer", "https://www.bilibili.com")
     }.body()
@@ -384,9 +391,19 @@ object BiliHttpApi {
     suspend fun getUserInfo(
         uid: Long,
         sessData: String = ""
-    ): BiliResponse<UserInfoData> = client.get("/x/space/acc/info") {
+    ): BiliResponse<UserInfoData> = client.get("/x/space/wbi/acc/info") {
         parameter("mid", uid)
         header("Cookie", "SESSDATA=$sessData;")
+
+        // 风控
+        parameter("dm_img_list", "[]")
+        parameter("dm_img_str", "V2ViR0wgMS4wIChPcGVuR0wgRVMgMi4wIENocm9taXVtKQ")
+        parameter(
+            "dm_cover_img_str",
+            "QU5HTEUgKEFNRCwgQU1EIFJhZGVvbiA3ODBNIEdyYXBoaWNzICgweDAwMDAxNUJGKSBEaXJlY3QzRDExIHZzXzVfMCBwc181XzAsIEQzRDExKUdvb2dsZSBJbmMuIChBTU"
+        )
+        parameter("dm_img_inter", "{\"ds\":[],\"wh\":[4769,2793,43],\"of\":[285,570,285]}")
+        header("referer", "https://space.bilibili.com")
     }.body()
 
 
@@ -397,11 +414,11 @@ object BiliHttpApi {
      * @param photo 是否请求用户主页头图
      */
     suspend fun getUserCardInfo(
-        uid: Long,
+        mid: Long,
         photo: Boolean = false,
         sessData: String = ""
     ): BiliResponse<UserCardData> = client.get("/x/web-interface/card") {
-        parameter("mid", uid)
+        parameter("mid", mid)
         parameter("photo", photo)
         header("Cookie", "SESSDATA=$sessData;")
     }.body()
@@ -690,6 +707,25 @@ object BiliHttpApi {
     }
 
     /**
+     * 检查视频[avid]或[bvid]是否已点赞&收藏&投币
+     */
+    suspend fun getArchiveRelation(
+        avid: Long? = null,
+        bvid: String? = null,
+        accessKey: String? = null,
+        sessData: String? = null
+    ): BiliResponse<ArchiveRelation> {
+        checkToken(accessKey, sessData)
+        val response = client.get("/x/web-interface/archive/relation") {
+            require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
+            avid?.let { parameter("aid", it) }
+            bvid?.let { parameter("bvid", it) }
+            accessKey?.let { parameter("access_key", it) }
+            sessData?.let { header("Cookie", "SESSDATA=$it;") }
+        }
+        return response.body()
+    }
+    /**
      * 为视频[avid]或[bvid]点赞或取消赞
      *
      * @param like 是否点赞
@@ -910,12 +946,14 @@ object BiliHttpApi {
         mid: Long,
         lastAvid: Long,
         order: String = "pubdate",
+        ts: Long,
         accessKey: String
     ): BiliResponse<AppSpaceVideoData> =
         client.get("https://app.bilibili.com/x/v2/space/archive/cursor") {
             parameter("vmid", mid)
             parameter("aid", lastAvid)
             parameter("order", order)
+            parameter("ts", ts)
             parameter("access_key", accessKey)
         }.body()
 
@@ -1327,6 +1365,7 @@ object BiliHttpApi {
         tid: Int? = null,
         order: String? = null,
         duration: Int? = null,
+        sessData: String? = null,
         buvid3: String? = null
     ): BiliResponse<SearchResultData> {
         val response = client.get("/x/web-interface/wbi/search/type") {
@@ -1336,22 +1375,12 @@ object BiliHttpApi {
             tid?.let { parameter("tids", it) }
             order?.let { parameter("order", it) }
             duration?.let { parameter("duration", it) }
-            header("Cookie", "buvid3=$buvid3;")
-            header("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36")
+            if (sessData != null) {
+                header("Cookie", "SESSDATA=$sessData;buvid3=$buvid3;")
+            } else {
+                header("Cookie", "buvid3=$buvid3;")
+            }
             header("referer", "https://search.bilibili.com/")
-
-            // val chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            // val len = 32
-            // val qvid = buildString {
-            //     repeat(len) {
-            //         val r = Math.random()
-            //         val index = (r * chars.length).toInt()
-            //         append(chars[index])
-            //     }
-            // }
-            // parameter("qv_id", qvid)
-            // parameter("from_spmid", "333.337")
-            // parameter("platform", "pc")
         }
 
         return try {

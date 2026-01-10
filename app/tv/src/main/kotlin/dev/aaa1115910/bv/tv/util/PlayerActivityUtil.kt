@@ -21,8 +21,11 @@ fun launchPlayerActivity(
     proxyArea: ProxyArea = ProxyArea.MainLand,
     playerIconIdle: String = "",
     playerIconMoving: String = "",
-    play: Int = 0,
+    play: Long = 0,
     danmaku: Int = 0,
+    like: Int = 0,
+    coin: Int = 0,
+    favorite: Int = 0,
     upName: String = "",
     upId: Long = 0L,
     upFace: String = "",
@@ -32,13 +35,13 @@ fun launchPlayerActivity(
         VideoPlayerV3Activity.actionStart(
             context, avid, cid, title, partTitle, played, fromSeason, subType, epid, seasonId,
             isVerticalVideo, proxyArea, playerIconIdle, playerIconMoving,
-            play, danmaku, upName, upId, upFace, pubTime
+            play, danmaku, like, coin, favorite, upName, upId, upFace, pubTime
         )
     } else {
         RemoteControllerPanelDemoActivity.actionStart(
             context, avid, cid, title, partTitle, played, fromSeason, subType, epid, seasonId,
             isVerticalVideo, proxyArea, playerIconIdle, playerIconMoving,
-            play, danmaku, upName, upId, upFace, pubTime
+            play, danmaku, like, coin, favorite, upName, upId, upFace, pubTime
         )
     }
 }

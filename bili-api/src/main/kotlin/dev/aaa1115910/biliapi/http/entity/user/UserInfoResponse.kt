@@ -63,8 +63,8 @@ data class UserInfoData(
     val coins: Float,
     @SerialName("fans_badge")
     val fansBadge: Boolean,
-    @SerialName("fans_medal")
-    val fansMedal: FansMedal,
+//    @SerialName("fans_medal")
+//    val fansMedal: FansMedal,
     val official: Official,
     val vip: Vip,
     val pendant: Pendant,
@@ -77,7 +77,7 @@ data class UserInfoData(
     val topPhoto: String,
     //val theme: Any? = null,
     val sys_notice: SysNotice,
-    val live_room: LiveRoom,
+    val live_room: LiveRoom? = null,
     val birthday: String,
     val school: School? = null,
     val profession: Profession,

@@ -40,10 +40,7 @@ android {
             )
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+
     buildFeatures {
         compose = true
     }
@@ -51,7 +48,7 @@ android {
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(AppConfiguration.jdk))
     }
 }
 
@@ -71,6 +68,7 @@ dependencies {
     implementation(androidx.media3.ui)
     implementation(libs.logging)
     implementation(libs.material)
+    implementation(project(":akdanmaku"))
     implementation(project(":libs:ffmpegDecoder"))
     implementation(project(":player:shared"))
     testImplementation(libs.kotlin.test)

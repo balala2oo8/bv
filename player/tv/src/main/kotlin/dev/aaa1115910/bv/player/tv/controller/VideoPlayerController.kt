@@ -42,12 +42,14 @@ import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerDebugInfoData
-import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekData
+import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekState
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
+import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoListItem
+import dev.aaa1115910.bv.player.entity.VideoRotation
 import dev.aaa1115910.bv.player.seekbar.SeekMoveState
 import dev.aaa1115910.bv.player.shared.BuildConfig
 import dev.aaa1115910.bv.player.shared.R
@@ -84,12 +86,18 @@ fun VideoPlayerController(
     onOpenDanmaku: () -> Unit,
     onHideDanmaku: () -> Unit,
     onLoopPlayModeChange: (Boolean) -> Unit,
-    userActionContent: @Composable (focusMap: Map<String, FocusRequester>, onFocus: (String) -> Unit, onPauseAutoHide: (Boolean) -> Unit) -> Unit,
+    userActionContent: @Composable (
+        modifier: Modifier,
+        focusMap: Map<String, FocusRequester>,
+        onFocus: (String) -> Unit,
+        onPauseAutoHide: (Boolean) -> Unit
+    ) -> Unit,
 
     //menu events
     onResolutionChange: (Resolution) -> Unit,
     onCodecChange: (VideoCodec) -> Unit,
     onAspectRatioChange: (VideoAspectRatio) -> Unit,
+    onRotationChange: (VideoRotation) -> Unit,
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
@@ -101,12 +109,14 @@ fun VideoPlayerController(
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit,
+    onLoadNextVideo: (Boolean) -> Unit,
 
     onRequestFocus: () -> Unit,
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
-    val videoPlayerSeekData = LocalVideoPlayerSeekData.current
+    val videoPlayerSeekState = LocalVideoPlayerSeekState.current
     val videoPlayerStateData = LocalVideoPlayerStateData.current
     val videoPlayerDebugInfoData = LocalVideoPlayerDebugInfoData.current
     val logger = KotlinLogging.logger {}
@@ -133,7 +143,7 @@ fun VideoPlayerController(
     var doublePressDownJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     val openSeekController = {
-        if (!showSeekController) goTime = videoPlayerSeekData.position
+        if (!showSeekController) goTime = videoPlayerSeekState.position
         showSeekController = true
         showInfo = false
     }
@@ -168,8 +178,8 @@ fun VideoPlayerController(
     val onTimeForward = {
         val baseTime = playerSeekForwardStep * 1000L // 转换为毫秒
         val targetTime = goTime + (baseTime + calCoefficient() * 5000)
-        goTime =
-            if (targetTime > videoPlayerSeekData.duration) videoPlayerSeekData.duration else targetTime
+        val duration = videoPlayerSeekState.duration
+        goTime = if (targetTime > duration) duration else targetTime
         lastSeekChangeTime = System.currentTimeMillis()
         moveState = SeekMoveState.Forward
         resetAutoSeekConfirmTimer()
@@ -184,7 +194,7 @@ fun VideoPlayerController(
         resetAutoSeekConfirmTimer()
         logger.info { "onTimeBack: [current=${videoPlayer.currentPosition}, goTime=$goTime]" }
     }
-    
+
     // 对外暴露 showInfo
     LaunchedEffect(Unit) { registerShowInfoProvider { showInfo } }
 
@@ -293,7 +303,7 @@ fun VideoPlayerController(
                     Key.DirectionDown -> {
                         if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
                         logger.info { "[${it.key} press]" }
-                        
+
                         // 检查是否为连按两次（间隔小于300ms且上次按键时间不为0）
                         val currentTime = System.currentTimeMillis()
                         val isDoublePress = lastPressDown != 0L && currentTime - lastPressDown < 300
@@ -471,7 +481,24 @@ fun VideoPlayerController(
                 showMenuController = true
             },
             onLoopPlayModeChange = onLoopPlayModeChange,
-            userActionContent = userActionContent
+            onRotationChange = onRotationChange,
+            userActionContent = userActionContent,
+            onSeekBack = {
+                scope.launch(Dispatchers.Main) {
+                    delay(100)
+                    openSeekController()
+                    onTimeBack()
+                }
+            },
+            onSeekForward = {
+                scope.launch(Dispatchers.Main) {
+                    delay(100)
+                    openSeekController()
+                    onTimeForward()
+                }
+            },
+            onSubtitleChange = onSubtitleChange,
+            onLoadNextVideo = onLoadNextVideo
         )
         SeekController(
             show = showSeekController,
@@ -487,6 +514,7 @@ fun VideoPlayerController(
             onResolutionChange = onResolutionChange,
             onCodecChange = onCodecChange,
             onAspectRatioChange = onAspectRatioChange,
+            onRotationChange = onRotationChange,
             onPlaySpeedChange = onPlaySpeedChange,
             onAudioChange = onAudioChange,
             onDanmakuSwitchChange = onDanmakuSwitchChange,
@@ -497,7 +525,8 @@ fun VideoPlayerController(
             onSubtitleChange = onSubtitleChange,
             onSubtitleSizeChange = onSubtitleSizeChange,
             onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
-            onSubtitleBottomPadding = onSubtitleBottomPadding
+            onSubtitleBottomPadding = onSubtitleBottomPadding,
+            onPlayModeChange = onPlayModeChange
         )
         // 缓存底部进度条显示条件，避免频繁计算
         val shouldShowBottomProgressBar by remember { 
@@ -530,7 +559,7 @@ fun VideoPlayerController(
                     .height(2.2.dp),
                 progress = { throttledProgress },
                 color = SliderDefaults.colors().activeTrackColor,
-                trackColor = Color.Black.copy(alpha = 0.3f),
+                trackColor = Color.Black.copy(alpha = 0.4f),
                 gapSize = 0.dp,
                 drawStopIndicator = {}
             )

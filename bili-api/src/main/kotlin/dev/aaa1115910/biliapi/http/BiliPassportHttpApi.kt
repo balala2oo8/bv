@@ -1,5 +1,6 @@
 package dev.aaa1115910.biliapi.http
 
+import dev.aaa1115910.biliapi.BiliApiConstants
 import dev.aaa1115910.biliapi.http.entity.BiliResponse
 import dev.aaa1115910.biliapi.http.entity.login.CaptchaData
 import dev.aaa1115910.biliapi.http.entity.login.qr.AppQRDataRequest
@@ -8,11 +9,11 @@ import dev.aaa1115910.biliapi.http.entity.login.qr.RequestWebQRData
 import dev.aaa1115910.biliapi.http.entity.login.qr.WebQRLoginData
 import dev.aaa1115910.biliapi.http.entity.login.sms.SendSmsResponse
 import dev.aaa1115910.biliapi.http.entity.login.sms.SmsLoginResponse
+import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
 import dev.aaa1115910.biliapi.http.util.encApiSign
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.BrowserUserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -37,7 +38,7 @@ object BiliPassportHttpApi {
 
     private fun createClient() {
         client = HttpClient(OkHttp) {
-            BrowserUserAgent()
+            BiliUserAgent()
             install(ContentNegotiation) {
                 json(Json {
                     coerceInputValues = true

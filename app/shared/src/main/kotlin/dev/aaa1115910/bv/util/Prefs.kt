@@ -20,8 +20,11 @@ import dev.aaa1115910.bv.entity.PlayerType
 import dev.aaa1115910.bv.entity.ThemeType
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.entity.PlayMode
+import dev.aaa1115910.bv.player.entity.PortraitVideoFixMode
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoCodec
+import dev.aaa1115910.bv.player.entity.PlayerLoadNextAction
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -312,42 +315,59 @@ object Prefs {
             ThemeType.entries[dsm.getPreferenceFlow(PrefKeys.prefThemeTypeRequest).first()]
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefThemeTypeKey, value.ordinal) }
+
     val themeTypeFlow: Flow<ThemeType>
         get() = dsm.getPreferenceFlow(PrefKeys.prefThemeTypeRequest)
             .transform { ordinal -> emit(ThemeType.entries[ordinal]) }
+
+    var defaultPlayMode: PlayMode
+        get() = runBlocking {
+            PlayMode.entries[dsm.getPreferenceFlow(PrefKeys.prefPlayModeRequest).first()]
+        }
+        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayModeKey, value.ordinal) }
 
     var defaultHomeTab: Int
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefDefaultHomeTabRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefDefaultHomeTabKey, value) }
 
-    var portraitVideoQualityLimitMax1080P: Boolean
-        get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefportraitVideoQualityLimitMax1080PRequest).first() }
-        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefportraitVideoQualityLimitMax1080PKey, value) }
+
+    var portraitVideoFixMode: PortraitVideoFixMode
+        get() = runBlocking {
+            // 读取整型枚举值
+            val intValue = dsm.getPreferenceFlow(PrefKeys.prefPortraitVideoFixModeRequest).first()
+            PortraitVideoFixMode.fromValue(intValue)
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefPortraitVideoFixModeKey, value.value)
+        }
 
     var playerShowDebugInfo: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerShowDebugInfoRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerShowDebugInfoKey, value) }
 
+    var playerLoadNextAction: PlayerLoadNextAction
+        get() = runBlocking {
+            val intValue = dsm.getPreferenceFlow(PrefKeys.prefPlayerLoadNextActionRequest).first()
+            PlayerLoadNextAction.fromValue(intValue)
+        }
+        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerLoadNextActionKey, value.value) }
+
     var playerExitWhenAllIsPlayed: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerExitWhenAllIsPlayedRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerExitWhenAllIsPlayedKey, value) }
-        
-    var playerAutoPlayNextVideo: Boolean
-        get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerAutoPlayNextVideoRequest).first() }
-        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerAutoPlayNextVideoKey, value) }
-    
+
     var playerSeekForwardStep: Int
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerSeekForwardStepRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerSeekForwardStepKey, value) }
-    
+
     var playerSeekBackwardStep: Int
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerSeekBackwardStepRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerSeekBackwardStepKey, value) }
-    
+
     var playerShowBottomProgressBar: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPlayerShowBottomProgressBarRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerShowBottomProgressBarKey, value) }
-    
+
     var showUGCVideoInfo: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefShowUGCVideoInfoRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefShowUGCVideoInfoKey, value) }
@@ -355,7 +375,7 @@ object Prefs {
     var isLoop: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefIsLoopRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefIsLoopKey, value) }
-    
+
     var showDanmaku: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefShowDanmakuRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefShowDanmakuKey, value) }
@@ -405,17 +425,18 @@ object PrefKeys {
     val prefEnableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
     val prefThemeTypeKey = intPreferencesKey("theme_type")
+    val prefPlayModeKey = intPreferencesKey("play_mode")
     val prefDefaultHomeTabKey = intPreferencesKey("default_home_tab")
-    val prefportraitVideoQualityLimitMax1080PKey = booleanPreferencesKey("portrait_video_default_use_1080p_quality")
+    val prefPortraitVideoFixModeKey = intPreferencesKey("portrait_video_fix_mode")
     val prefPlayerShowDebugInfoKey = booleanPreferencesKey("player_show_debug_info")
     val prefPlayerExitWhenAllIsPlayedKey = booleanPreferencesKey("player_exit_when_all_is_played")
-    val prefPlayerAutoPlayNextVideoKey = booleanPreferencesKey("player_auto_play_next_video")
     val prefPlayerSeekForwardStepKey = intPreferencesKey("player_seek_forward_step")
     val prefPlayerSeekBackwardStepKey = intPreferencesKey("player_seek_backward_step")
     val prefPlayerShowBottomProgressBarKey = booleanPreferencesKey("player_show_bottom_progress_bar")
     val prefShowUGCVideoInfoKey = booleanPreferencesKey("pref_show_ugc_video_info")
     val prefIsLoopKey = booleanPreferencesKey("player_is_loop")
     val prefShowDanmakuKey = booleanPreferencesKey("player_show_danmaku")
+    val prefPlayerLoadNextActionKey = intPreferencesKey("player_load_next_action")
 
 
     val prefIsLoginRequest = PreferenceRequest(prefIsLoginKey, false)
@@ -430,7 +451,7 @@ object PrefKeys {
     val prefDefaultQualityRequest = PreferenceRequest(prefDefaultQualityKey, Resolution.R1080P.code)
     val prefDefaultAudioRequest = PreferenceRequest(prefDefaultAudioKey, Audio.A192K.code)
     val prefDefaultDanmakuSizeRequest = PreferenceRequest(prefDefaultDanmakuSizeKey, 6)
-    val prefDefaultDanmakuScaleRequest = PreferenceRequest(prefDefaultDanmakuScaleKey, 1.1f)
+    val prefDefaultDanmakuScaleRequest = PreferenceRequest(prefDefaultDanmakuScaleKey, 1.25f)
     val prefDefaultDanmakuTransparencyRequest =
         PreferenceRequest(prefDefaultDanmakuTransparencyKey, 0)
     val prefDefaultDanmakuOpacityRequest = PreferenceRequest(prefDefaultDanmakuOpacityKey, 0.8f)
@@ -475,15 +496,16 @@ object PrefKeys {
     val prefEnableFfmpegEndererRequest = PreferenceRequest(prefEnableFfmpegAudioRenderer, true)
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
     val prefThemeTypeRequest = PreferenceRequest(prefThemeTypeKey, ThemeType.Auto.ordinal)
+    val prefPlayModeRequest = PreferenceRequest(prefPlayModeKey, PlayMode.Sequential.ordinal)
     val prefDefaultHomeTabRequest = PreferenceRequest(prefDefaultHomeTabKey, 0)
-    val prefportraitVideoQualityLimitMax1080PRequest = PreferenceRequest(prefportraitVideoQualityLimitMax1080PKey, false)
+    val prefPortraitVideoFixModeRequest = PreferenceRequest(prefPortraitVideoFixModeKey, 0)
     val prefPlayerShowDebugInfoRequest = PreferenceRequest(prefPlayerShowDebugInfoKey, true)
     val prefPlayerExitWhenAllIsPlayedRequest = PreferenceRequest(prefPlayerExitWhenAllIsPlayedKey, true)
-    val prefPlayerAutoPlayNextVideoRequest = PreferenceRequest(prefPlayerAutoPlayNextVideoKey, true)
     val prefPlayerSeekForwardStepRequest = PreferenceRequest(prefPlayerSeekForwardStepKey, 10)
     val prefPlayerSeekBackwardStepRequest = PreferenceRequest(prefPlayerSeekBackwardStepKey, 5)
     val prefPlayerShowBottomProgressBarRequest = PreferenceRequest(prefPlayerShowBottomProgressBarKey, false)
     val prefShowUGCVideoInfoRequest = PreferenceRequest(prefShowUGCVideoInfoKey, true)
     val prefIsLoopRequest = PreferenceRequest(prefIsLoopKey, false)
     val prefShowDanmakuRequest = PreferenceRequest(prefShowDanmakuKey, true)
+    val prefPlayerLoadNextActionRequest = PreferenceRequest(prefPlayerLoadNextActionKey, PlayerLoadNextAction.DoNothing.value)
 }

@@ -174,10 +174,10 @@ fun VideoInfoScreen(
 
     var showFollowButton by remember { mutableStateOf(false) }
     var isFollowing by remember { mutableStateOf(false) }
-    
+
     // 监听关注状态变化
     val followStateMap by FollowStateManager.followStateMap.collectAsState()
-    
+
     // 当关注状态map变化时，更新当前用户的关注状态
     LaunchedEffect(followStateMap, videoDetailViewModel.videoDetail?.author?.mid) {
         videoDetailViewModel.videoDetail?.author?.mid?.let { mid ->
@@ -186,7 +186,7 @@ fun VideoInfoScreen(
             }
         }
     }
-    
+
     // 添加用于管理简介对话框的状态
     var showDescriptionDialog by remember { mutableStateOf(false) }
 
@@ -250,7 +250,7 @@ fun VideoInfoScreen(
     val updateFollowingState: () -> Unit = {
         scope.launch(Dispatchers.IO) {
             val userMid = videoDetailViewModel.videoDetail?.author?.mid ?: -1
-            
+
             // 先检查缓存中是否有关注状态
             val cachedState = FollowStateManager.getFollowState(userMid)
             if (cachedState != null) {
@@ -260,7 +260,7 @@ fun VideoInfoScreen(
                 }
                 return@launch
             }
-            
+
             // 缓存中没有，调用API获取
             logger.fInfo { "Checking is following user $userMid" }
             val success = userRepository.checkIsFollowing(
@@ -321,7 +321,8 @@ fun VideoInfoScreen(
 
     val updateVideoFavoriteData: (List<Long>) -> Unit = { folderIds ->
         scope.launch {
-            val success = VideoUserActionManager.updateVideoFavoriteFolders(aid, folderIds, Prefs.uid)
+            val success =
+                VideoUserActionManager.updateVideoFavoriteFolders(aid, folderIds, Prefs.uid)
             if (!success) {
                 "收藏操作失败".toast(context)
             }
@@ -350,7 +351,8 @@ fun VideoInfoScreen(
 
     val updateUgcSeasonSectionVideoList: (Int) -> Unit = { sectionIndex ->
         val partVideoList = mutableListOf<VideoListItem>()
-        val sectionTitle = videoDetailViewModel.videoDetail!!.ugcSeason!!.sections[sectionIndex]?.title ?: ""
+        val sectionTitle =
+            videoDetailViewModel.videoDetail!!.ugcSeason!!.sections[sectionIndex]?.title ?: ""
         videoDetailViewModel.videoDetail!!.ugcSeason!!.sections[sectionIndex].episodes.mapIndexed { epIndex, episode ->
             if (episode.pages.size == 1) {
                 episode.pages.mapIndexed { pageInd, videoPage ->
@@ -400,10 +402,10 @@ fun VideoInfoScreen(
     }
 
 
-  suspend fun addVideoCoin(): Boolean {
-      val configAid = videoDetailViewModel.videoDetail?.aid ?: 0L
-      return VideoUserActionManager.addCoin(configAid, Prefs.uid)
-  }
+    suspend fun addVideoCoin(): Boolean {
+        val configAid = videoDetailViewModel.videoDetail?.aid ?: 0L
+        return VideoUserActionManager.addCoin(configAid, Prefs.uid)
+    }
 
     LaunchedEffect(Unit) {
         if (intent.hasExtra("aid")) {
@@ -442,7 +444,12 @@ fun VideoInfoScreen(
 
                     videoInfoRepository.relatedVideos.clear()
                     if (!fromSeason) {
-                        videoInfoRepository.relatedVideos.addAll(videoDetailViewModel.relatedVideos.subList(0, videoDetailViewModel.relatedVideos.size.takeIf { it<12 } ?: 12))
+                        if (Prefs.isLogin) updateFollowingState()
+
+                        videoInfoRepository.relatedVideos.addAll(
+                            videoDetailViewModel.relatedVideos.subList(
+                                0,
+                                videoDetailViewModel.relatedVideos.size.takeIf { it < 16 } ?: 16))
                     }
                     // 从播放器推荐视频打开时 fromPlayer=true 并显示loading。300m后 fromPlayer改成false，此后从播放器返回详情页，正常显示详情内容
                     //如果是从剧集跳转过来的或设置不显示视频详情，就直接播放 P1
@@ -453,31 +460,37 @@ fun VideoInfoScreen(
                         if (videoDetailViewModel.videoDetail!!.ugcSeason !== null) {
                             val sectionIndex =
                                 videoDetailViewModel.videoDetail!!.ugcSeason!!.sections
-                                    .indexOfFirst { section -> section.episodes.any { it.cid == cid || it.pages.any{ it.cid == cid } } }
+                                    .indexOfFirst { section -> section.episodes.any { it.cid == cid || it.pages.any { it.cid == cid } } }
                             updateUgcSeasonSectionVideoList(sectionIndex)
                         }
 
-                        launchPlayerActivity(
-                            context = context,
-                            avid = videoDetailViewModel.videoDetail!!.aid,
-                            cid = cid,
-                            title = videoDetailViewModel.videoDetail!!.title,
-                            partTitle = videoDetailViewModel.videoDetail!!.pages.find { it.cid == cid }!!.title,
-                            played = if (cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
-                            fromSeason = fromSeason,
-                            isVerticalVideo = videoDetailViewModel.videoDetail!!.pages.find { it.cid == cid }!!.dimension.isVertical,
-                            playerIconIdle = videoDetailViewModel.videoDetail!!.playerIcon?.idle
-                                ?: "",
-                            playerIconMoving = videoDetailViewModel.videoDetail!!.playerIcon?.moving
-                                ?: "",
-                            play = videoDetailViewModel.videoDetail!!.stat.view,
-                            danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
-                            upName = videoDetailViewModel.videoDetail!!.author.name,
-                            upId = videoDetailViewModel.videoDetail!!.author.mid,
-                            upFace = videoDetailViewModel.videoDetail!!.author.face,
-                            pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
-                        )
-                        if(fromPlayer) {
+                        // 检查Activity是否已经finish，如果已关闭则不启动播放器
+                        if (!context.isFinishing && !context.isDestroyed) {
+                            launchPlayerActivity(
+                                context = context,
+                                avid = videoDetailViewModel.videoDetail!!.aid,
+                                cid = cid,
+                                title = videoDetailViewModel.videoDetail!!.title,
+                                partTitle = videoDetailViewModel.videoDetail!!.pages.find { it.cid == cid }!!.title,
+                                played = if (cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
+                                fromSeason = fromSeason,
+                                isVerticalVideo = videoDetailViewModel.videoDetail!!.pages.find { it.cid == cid }!!.dimension.isVertical,
+                                playerIconIdle = videoDetailViewModel.videoDetail!!.playerIcon?.idle
+                                    ?: "",
+                                playerIconMoving = videoDetailViewModel.videoDetail!!.playerIcon?.moving
+                                    ?: "",
+                                play = videoDetailViewModel.videoDetail!!.stat.view,
+                                danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
+                                like = videoDetailViewModel.videoDetail!!.stat.like,
+                                coin = videoDetailViewModel.videoDetail!!.stat.coin,
+                                favorite = videoDetailViewModel.videoDetail!!.stat.favorite,
+                                upName = videoDetailViewModel.videoDetail!!.author.name,
+                                upId = videoDetailViewModel.videoDetail!!.author.mid,
+                                upFace = videoDetailViewModel.videoDetail!!.author.face,
+                                pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
+                            )
+                        }
+                        if (fromPlayer) {
                             // 清除标记, 以便从播放器返回过来的可以进入详情页
                             scope.launch {
                                 delay(1200)
@@ -561,18 +574,17 @@ fun VideoInfoScreen(
                 logger.fInfo { "No redirection required" }
                 defaultFocusRequester.requestFocus(scope)
             }
-
-            if (!fromSeason && showUGCVideoInfo) updateFollowingState()
         }
     }
 
     // 确保页面显示时封面获得焦点
     LaunchedEffect(videoDetailViewModel.videoDetail, fromSeason, showUGCVideoInfo, fromPlayer) {
-        if (videoDetailViewModel.videoDetail != null && 
-            !videoDetailViewModel.videoDetail!!.redirectToEp && 
-            !fromSeason && 
-            showUGCVideoInfo && 
-            !fromPlayer) {
+        if (videoDetailViewModel.videoDetail != null &&
+            !videoDetailViewModel.videoDetail!!.redirectToEp &&
+            !fromSeason &&
+            showUGCVideoInfo &&
+            !fromPlayer
+        ) {
             // 延迟一小段时间确保UI完全渲染
             delay(300)
             defaultFocusRequester.requestFocus(scope)
@@ -605,7 +617,7 @@ fun VideoInfoScreen(
         ) {
             if (tip == "Loading") {
                 LoadingTip()
-            }else{
+            } else {
                 Text(
                     text = tip,
                     fontSize = 20.sp
@@ -628,9 +640,9 @@ fun VideoInfoScreen(
                 AsyncImage(
                     modifier = Modifier.fillMaxSize(),
                     model = ImageRequest.Builder(LocalContext.current)
-                    .data(videoDetailViewModel.videoDetail?.cover)
-                    .transformations(BlurTransformation(LocalContext.current, 20f, 5f))
-                    .build(),
+                        .data(videoDetailViewModel.videoDetail?.cover)
+                        .transformations(BlurTransformation(LocalContext.current, 20f, 5f))
+                        .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     alpha = animatedAlpha,
@@ -641,21 +653,21 @@ fun VideoInfoScreen(
                 LazyColumn(
                     modifier = Modifier
                         .onKeyEvent { event ->
-                             if (event.type == KeyEventType.KeyDown) {
-                                 when (event.key) {
-                                     Key.DirectionUp -> {
-                                         scope.launch {
-                                             lazyListState.animateScrollBy(-200f)
-                                         }
-                                     }
-                                     Key.DirectionDown -> {
-                                         scope.launch {
-                                             lazyListState.animateScrollBy(200f)
-                                         }
-                                     }
-                                 }
-                             }
-                             return@onKeyEvent false
+                            if (event.type == KeyEventType.KeyDown) {
+                                when (event.key) {
+                                    Key.DirectionUp -> {
+                                        scope.launch {
+                                            lazyListState.animateScrollBy(-200f)
+                                        }
+                                    }
+                                    Key.DirectionDown -> {
+                                        scope.launch {
+                                            lazyListState.animateScrollBy(200f)
+                                        }
+                                    }
+                                }
+                            }
+                            return@onKeyEvent false
                         },
                     state = lazyListState,
                     contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
@@ -699,10 +711,16 @@ fun VideoInfoScreen(
                                             videoDetailViewModel.videoDetail!!.pages.first().cid
                                         val sectionIndex =
                                             videoDetailViewModel.videoDetail!!.ugcSeason!!.sections
-                                                .indexOfFirst { section -> section.episodes.any { it.cid == cid || it.pages.any{ it.cid == cid } } }
-                                        val section = videoDetailViewModel.videoDetail!!.ugcSeason!!.sections.getOrNull(sectionIndex)
-                                        title = if (section?.title == "正片") section.episodes.find { it.cid == cid }!!.title else section?.title ?: ""
-                                        partTitle = if (section?.title == "正片") "" else section?.episodes?.find { it.cid == cid }!!.title
+                                                .indexOfFirst { section -> section.episodes.any { it.cid == cid || it.pages.any { it.cid == cid } } }
+                                        val section =
+                                            videoDetailViewModel.videoDetail!!.ugcSeason!!.sections.getOrNull(
+                                                sectionIndex
+                                            )
+                                        title =
+                                            if (section?.title == "正片") section.episodes.find { it.cid == cid }!!.title else section?.title
+                                                ?: ""
+                                        partTitle =
+                                            if (section?.title == "正片") "" else section?.episodes?.find { it.cid == cid }!!.title
                                         updateUgcSeasonSectionVideoList(sectionIndex)
                                     }
                                 } else {
@@ -720,13 +738,19 @@ fun VideoInfoScreen(
                                     videoInfoRepository.videoList.clear()
                                     videoInfoRepository.videoList.addAll(partVideoList)
                                 }
+
+                                val lastPlayedPage =
+                                    videoDetailViewModel.videoDetail!!.pages.find { it.cid == lastPlayedCid }
+                                val playPage = lastPlayedPage
+                                    ?: videoDetailViewModel.videoDetail!!.pages.first()
+
                                 launchPlayerActivity(
                                     context = context,
                                     avid = videoDetailViewModel.videoDetail!!.aid,
-                                    cid = videoDetailViewModel.videoDetail!!.pages.first().cid,
+                                    cid = playPage.cid,
                                     title = if (title.isNotEmpty()) title else videoDetailViewModel.videoDetail!!.title,
-                                    partTitle = if (partTitle.isNotEmpty()) partTitle else if (videoDetailViewModel.videoDetail!!.pages.size == 1) "" else videoDetailViewModel.videoDetail!!.pages.first().title,
-                                    played = if (videoDetailViewModel.videoDetail!!.cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
+                                    partTitle = if (partTitle.isNotEmpty()) partTitle else if (videoDetailViewModel.videoDetail!!.pages.size == 1) "" else playPage.title,
+                                    played = if (playPage.cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
                                     fromSeason = false,
                                     isVerticalVideo = videoDetailViewModel.videoDetail!!.pages.first().dimension.isVertical,
                                     playerIconIdle = videoDetailViewModel.videoDetail!!.playerIcon?.idle
@@ -735,6 +759,9 @@ fun VideoInfoScreen(
                                         ?: "",
                                     play = videoDetailViewModel.videoDetail!!.stat.view,
                                     danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
+                                    like = videoDetailViewModel.videoDetail!!.stat.like,
+                                    coin = videoDetailViewModel.videoDetail!!.stat.coin,
+                                    favorite = videoDetailViewModel.videoDetail!!.stat.favorite,
                                     upName = videoDetailViewModel.videoDetail!!.author.name,
                                     upId = videoDetailViewModel.videoDetail!!.author.mid,
                                     upFace = videoDetailViewModel.videoDetail!!.author.face,
@@ -861,6 +888,9 @@ fun VideoInfoScreen(
                                             ?: "",
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
+                                        like = videoDetailViewModel.videoDetail!!.stat.like,
+                                        coin = videoDetailViewModel.videoDetail!!.stat.coin,
+                                        favorite = videoDetailViewModel.videoDetail!!.stat.favorite,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         upFace = videoDetailViewModel.videoDetail!!.author.face,
@@ -880,14 +910,19 @@ fun VideoInfoScreen(
                                 onClickEp = { aid, cid ->
                                     logger.fInfo { "Click ugc season episode: [av:${videoDetailViewModel.videoDetail?.aid}, bv:${videoDetailViewModel.videoDetail?.bvid}, cid:$cid]" }
                                     updateUgcSeasonSectionVideoList(index)
-                                    val sectionTitle = videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(index)?.title
+                                    val sectionTitle =
+                                        videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(
+                                            index
+                                        )?.title
                                     val episode = section.episodes.find { it.cid == cid }
                                     launchPlayerActivity(
                                         context = context,
                                         avid = aid,
                                         cid = cid,
-                                        title = if (sectionTitle == "正片") episode!!.title else sectionTitle ?: videoDetailViewModel.videoDetail?.ugcSeason?.title ?: "",
-                                        partTitle = if (sectionTitle == "正片") if (episode!!.pages.size>1) episode.pages.first().title else "" else episode!!.title,
+                                        title = if (sectionTitle == "正片") episode!!.title else sectionTitle
+                                            ?: videoDetailViewModel.videoDetail?.ugcSeason?.title
+                                            ?: "",
+                                        partTitle = if (sectionTitle == "正片") if (episode!!.pages.size > 1) episode.pages.first().title else "" else episode!!.title,
                                         played = if (cid == lastPlayedCid) lastPlayedTime * 1000 else 0,
                                         fromSeason = false,
                                         isVerticalVideo = videoDetailViewModel.videoDetail!!.pages.first().dimension.isVertical,
@@ -897,6 +932,9 @@ fun VideoInfoScreen(
                                             ?: "",
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
+                                        like = videoDetailViewModel.videoDetail!!.stat.like,
+                                        coin = videoDetailViewModel.videoDetail!!.stat.coin,
+                                        favorite = videoDetailViewModel.videoDetail!!.stat.favorite,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         upFace = videoDetailViewModel.videoDetail!!.author.face,
@@ -905,7 +943,10 @@ fun VideoInfoScreen(
                                 },
                                 onClickEpPart = { episode, cid ->
                                     logger.fInfo { "Click ugc season episode part: [av:${videoDetailViewModel.videoDetail?.aid}, bv:${videoDetailViewModel.videoDetail?.bvid}, cid:$cid]" }
-                                    val sectionTitle = videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(index)?.title
+                                    val sectionTitle =
+                                        videoDetailViewModel.videoDetail?.ugcSeason?.sections?.getOrNull(
+                                            index
+                                        )?.title
                                     launchPlayerActivity(
                                         context = context,
                                         avid = episode.aid,
@@ -921,6 +962,9 @@ fun VideoInfoScreen(
                                             ?: "",
                                         play = videoDetailViewModel.videoDetail!!.stat.view,
                                         danmaku = videoDetailViewModel.videoDetail!!.stat.danmaku,
+                                        like = videoDetailViewModel.videoDetail!!.stat.like,
+                                        coin = videoDetailViewModel.videoDetail!!.stat.coin,
+                                        favorite = videoDetailViewModel.videoDetail!!.stat.favorite,
                                         upName = videoDetailViewModel.videoDetail!!.author.name,
                                         upId = videoDetailViewModel.videoDetail!!.author.mid,
                                         upFace = videoDetailViewModel.videoDetail!!.author.face,
@@ -931,7 +975,7 @@ fun VideoInfoScreen(
                         }
                     }
                     if (videoDetailViewModel.relatedVideos.isNotEmpty()) {
-                        item { 
+                        item {
                             VideosRow(
                                 header = stringResource(R.string.video_info_related_video_title),
                                 videos = videoDetailViewModel.relatedVideos,
@@ -1023,8 +1067,9 @@ fun VideoInfoData(
 //    val localDensity = LocalDensity.current
 //    var heightIs by remember { mutableStateOf(0.dp) }
     val isLogin by remember { mutableStateOf(Prefs.isLogin) }
-    var coverHasFocus by remember { mutableStateOf(false) }
-    val videoDuration = videoDetail.pages.sumOf { it.duration }.takeIf { videoDetail.pages.isNotEmpty() } ?: 0
+//    var coverHasFocus by remember { mutableStateOf(false) }
+    val videoDuration =
+        videoDetail.pages.sumOf { it.duration }.takeIf { videoDetail.pages.isNotEmpty() } ?: 0
 
     Row(
         modifier = modifier
@@ -1038,7 +1083,7 @@ fun VideoInfoData(
 //                .onGloballyPositioned { coordinates ->
 //                    heightIs = with(localDensity) { coordinates.size.height.toDp() }
 //                }
-                .onFocusChanged { coverHasFocus = it.hasFocus }
+//                .onFocusChanged { coverHasFocus = it.hasFocus }
                 .padding(4.dp),
             onClick = onClickCover,
             shape = ClickableSurfaceDefaults.shape(
@@ -1063,6 +1108,21 @@ fun VideoInfoData(
                 contentDescription = null,
                 contentScale = ContentScale.Crop
             )
+            if (videoDetail.isChargingArc) {
+                Text(
+                    modifier = Modifier
+                        .padding(6.dp)
+                        .align(Alignment.TopEnd)
+                        .background(
+                            color = Color.Black.copy(0.3f),
+                            shape = MaterialTheme.shapes.extraSmall
+                        )
+                        .padding(all = 2.dp),
+                    text = "⚡${videoDetail.chargingArcBadge}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White
+                )
+            }
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1088,10 +1148,10 @@ fun VideoInfoData(
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start=16.dp, end=16.dp, bottom = 12.dp),
+                        .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
-                ){
+                ) {
                     Icon(
                         modifier = Modifier,
                         painter = painterResource(id = R.drawable.ic_play_count),
@@ -1099,7 +1159,7 @@ fun VideoInfoData(
                         tint = Color.White
                     )
                     Text(
-                        text = with(videoDetail.stat.view){if (this >= 10000) "${this / 10000}万" else "$this"},
+                        text = with(videoDetail.stat.view) { if (this >= 10000) "${this / 10000}万" else "$this" },
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White
                     )
@@ -1111,7 +1171,7 @@ fun VideoInfoData(
                         tint = Color.White
                     )
                     Text(
-                        text = with(videoDetail.stat.danmaku){if (this >= 10000) "${this / 10000}万" else "$this"},
+                        text = with(videoDetail.stat.danmaku) { if (this >= 10000) "${this / 10000}万" else "$this" },
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White
                     )
@@ -1143,7 +1203,9 @@ fun VideoInfoData(
                     color = Color.White
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
@@ -1162,7 +1224,7 @@ fun VideoInfoData(
                 LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset(x=(-3).dp),
+                        .offset(x = (-3).dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
@@ -1199,7 +1261,7 @@ fun VideoInfoData(
                                     .height(32.dp), // 设置高度
                                 isCoin = isCoin,
                                 onAddCoin = {
-                                     onAddCoin()
+                                    onAddCoin()
                                 }
                             )
                         }
@@ -1241,7 +1303,7 @@ fun VideoInfoData(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .offset(x=(-2).dp, y = (-2).dp),
+                    .offset(x = (-2).dp, y = (-2).dp),
                 contentPadding = PaddingValues(horizontal = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -1288,7 +1350,7 @@ private fun UpButton(
             UpIcon(color = Color.White)
             Text(text = name, color = Color.White)
         }
-        if(isLogin && showFollowButton) {
+        if (isLogin && showFollowButton) {
             Row(
                 modifier = Modifier
                     .clip(MaterialTheme.shapes.small)
@@ -1926,7 +1988,7 @@ private fun UpButtonPreview() {
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CoverPreview() {
-    Box{
+    Box {
         AsyncImage(
             modifier = Modifier
                 .fillMaxSize(),
@@ -1960,10 +2022,10 @@ private fun CoverPreview() {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(start=16.dp, end=16.dp, bottom = 12.dp),
+                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(2.dp)
-            ){
+            ) {
                 Icon(
                     modifier = Modifier,
                     painter = painterResource(id = R.drawable.ic_play_count),

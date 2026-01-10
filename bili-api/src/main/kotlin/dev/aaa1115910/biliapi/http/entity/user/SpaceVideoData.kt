@@ -97,7 +97,7 @@ data class WebSpaceVideoData(
             val length: String,
             val mid: Long,
             val pic: String,
-            val play: Int,
+            val play: Long,
             val review: Int,
             val subtitle: String,
             val title: String,
@@ -114,7 +114,11 @@ data class WebSpaceVideoData(
             @Transient
             val isAvoided: Boolean = _isAvoided == 1,
             @SerialName("attribute")
-            val attribute: Int
+            val attribute: Int,
+            @SerialName("is_charging_arc")
+            val isChargingArc: Boolean = false,
+            @SerialName("elec_arc_badge")
+            val elecArcBadge: String = ""
         ) {
             /**
              * 合集信息
@@ -133,7 +137,7 @@ data class WebSpaceVideoData(
                 @SerialName("ep_count")
                 val epCount: Int,
                 @SerialName("first_aid")
-                val firstAid: Long,
+                val firstAid: Long? = null,
                 val ptime: Int,
                 @SerialName("ep_num")
                 val epNum: Int
@@ -212,19 +216,19 @@ data class AppSpaceVideoData(
         val isPgc: Boolean,
         @SerialName("is_live_playback")
         val isLivePlayback: Boolean,
-        val play: Int,
+        val play: Long,
         val danmaku: Int,
         val ctime: Int,
         @SerialName("ugc_pay")
         val ugcPay: Int,
-        val author: String,
+        val author: String? = null,
         val state: Boolean,
-        val bvid: String,
+        val bvid: String? = null,
         val videos: Int,
         @SerialName("three_point")
         val threePoint: List<ThreePointItem> = emptyList(),
         @SerialName("first_cid")
-        val firstcid: Long,
+        val firstcid: Long? = null,
         @SerialName("cursor_attr")
         val cursorAttr: CursorAttr,
         @SerialName("icon_type")

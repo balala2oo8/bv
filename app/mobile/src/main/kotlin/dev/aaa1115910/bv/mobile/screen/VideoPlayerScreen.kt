@@ -272,6 +272,7 @@ fun VideoPlayerScreen(
                             currentSubtitleFontSize = playerViewModel.currentSubtitleFontSize,
                             currentSubtitleBackgroundOpacity = playerViewModel.currentSubtitleBackgroundOpacity,
                             currentSubtitleBottomPadding = playerViewModel.currentSubtitleBottomPadding,
+                            currentPlayMode = playerViewModel.currentPlayMode,
                             incognitoMode = Prefs.incognitoMode,
                         ),
                         LocalVideoPlayerDanmakuMasksData provides VideoPlayerDanmakuMasksData(
@@ -349,9 +350,11 @@ fun VideoPlayerScreen(
                                 playerViewModel.currentDanmakuArea = area
                                 Prefs.defaultDanmakuArea = area
                             },
-                            onLoadNextVideo = {
-
+                            onPlayModeChange = { playMode ->
+                                playerViewModel.currentPlayMode = playMode
+                                Prefs.defaultPlayMode = playMode
                             },
+                            onLoadNextVideo = playerViewModel::playNextVideo,
                             onLoadNewVideo = { videoListItem ->
                                 logger.fInfo { "on load new video: $videoListItem" }
                                 var aid = 0L
@@ -702,7 +705,7 @@ fun VideoPlayerInfo(
     upFansCount: Int,
     title: String,
     description: String,
-    playCount: Int,
+    playCount: Long,
     danmakuCount: Int,
     date: String,
     avid: Long,

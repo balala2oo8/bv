@@ -2,11 +2,12 @@ package dev.aaa1115910.bv.network
 
 import dev.aaa1115910.bv.BuildConfig
 import dev.aaa1115910.bv.network.entity.Release
+import dev.aaa1115910.bv.util.NetworkUtil
 import dev.aaa1115910.bv.util.Prefs
 import io.ktor.client.HttpClient
 import io.ktor.client.content.ProgressListener
 import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.BrowserUserAgent
+import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -26,6 +27,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 object GithubApi {
     private var endPoint = "api.github.com"
@@ -46,7 +49,9 @@ object GithubApi {
 
     private fun createClient() {
         client = HttpClient(OkHttp) {
-            BrowserUserAgent()
+            install(UserAgent) {
+                agent = dev.aaa1115910.biliapi.BiliApiConstants.USER_AGENT_WEB
+            }
             install(ContentNegotiation) {
                 json(json)
             }
@@ -119,11 +124,17 @@ object GithubApi {
             if (isDebug) release.assets.firstOrNull { it.name.contains("debug") }?.browserDownloadUrl
             else release.assets.firstOrNull { it.name.contains("alpha") || it.name.contains("release") }?.browserDownloadUrl
         downloadUrl ?: throw IllegalStateException("Didn't find download url")
+        val isMainlandChina = NetworkUtil.isMainlandChina()
         client.prepareRequest {
-            url(downloadUrl)
+            url(if (isMainlandChina) toGhProxyUrl(downloadUrl) else downloadUrl)
             onDownload(downloadListener)
         }.execute { response ->
             response.bodyAsChannel().copyAndClose(file.writeChannel())
         }
+    }
+
+    private fun toGhProxyUrl(originalUrl: String): String {
+        val prefix = "https://ghfast.top/"
+        return prefix + URLEncoder.encode(originalUrl, StandardCharsets.UTF_8.toString())
     }
 }

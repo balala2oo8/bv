@@ -123,6 +123,10 @@ data class VideoInfo(
     @SerialName("rcmd_reason")
     private val _rcmdReason: JsonElement? = null,
     var rcmdReason: RcmdReason? = null,
+    @SerialName("is_upower_exclusive")
+    val isUpowerExclusive: Boolean = false,
+    @SerialName("is_upower_play")
+    val isUpowerPlay: Boolean = false
 ) {
     init {
         rcmdReason = if (_rcmdReason == null) {
@@ -234,7 +238,7 @@ data class VideoOwner(
 @Serializable
 data class VideoStat(
     val aid: Long = 0,
-    val view: Int = 0,
+    val view: Long = 0,
     val danmaku: Int = 0,
     val reply: Int = 0,
     val favorite: Int = 0,
@@ -323,4 +327,9 @@ data class HonorReplyItem(
     val desc: String,
     @SerialName("weekly_recommend_num")
     val weeklyRecommendNum: Int
+)
+
+@Serializable
+data class ChargingPay(
+    val level: Int = 0
 )

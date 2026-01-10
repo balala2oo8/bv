@@ -201,10 +201,12 @@ fun SearchResultScreen(
                     Column(
                         horizontalAlignment = Alignment.End,
                     ) {
-                        Text(
-                            text = stringResource(R.string.filter_dialog_open_tip),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        if (searchResultViewModel.searchType == SearchType.Video) {
+                            Text(
+                                text = stringResource(R.string.filter_dialog_open_tip),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
                         Text(
                             text = stringResource(
                                 R.string.load_data_count,
@@ -323,7 +325,7 @@ private fun SearchResultListItem(
                     avid = searchResult.aid,
                     title = searchResult.title.removeHtmlTags(),
                     cover = searchResult.cover,
-                    play = with(searchResult.play) { if (this == -1) null else this },
+                    play = with(searchResult.play) { if (this == -1L) null else this },
                     danmaku = with(searchResult.danmaku) { if (this == -1) null else this },
                     upName = searchResult.author,
                     time = searchResult.duration * 1000L,

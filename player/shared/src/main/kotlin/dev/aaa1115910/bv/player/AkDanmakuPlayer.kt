@@ -2,11 +2,10 @@ package dev.aaa1115910.bv.player
 
 import android.graphics.Color
 import android.os.Build
-import android.view.View.LAYER_TYPE_HARDWARE
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,16 +36,17 @@ fun AkDanmakuPlayer(
         }
     }
 
+//    // 调试重组次数: AtomicInteger，不被 Compose 追踪，只记录真实由外部状态引起的重组次数。
+//    val recomposeCounter = remember { java.util.concurrent.atomic.AtomicInteger(0) }
+//    SideEffect {
+//        val value = recomposeCounter.incrementAndGet()
+//        println("Recompose(DanmakuPlayer): $value")
+//    }
+
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
             danmakuView = DanmakuView(ctx).apply {
-                // 透明背景
-                setBackgroundColor(Color.TRANSPARENT)
-                
-                // 启用硬件加速
-                setLayerType(LAYER_TYPE_HARDWARE, null)
-                
                 // 确保View会被绘制
                 setWillNotDraw(false)
                 
@@ -54,8 +54,6 @@ fun AkDanmakuPlayer(
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
                     @Suppress("DEPRECATION")
                     isDrawingCacheEnabled = true
-                    @Suppress("DEPRECATION")
-                    setDrawingCacheBackgroundColor(Color.TRANSPARENT)
                 }
             }
             danmakuView!!

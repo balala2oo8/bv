@@ -380,8 +380,8 @@ data class DynamicItem(
                     text = moduleDynamic.desc?.text
                         ?: moduleDynamic.major?.opus?.summary?.text
                         ?: "empty text",
-                    images = (moduleDynamic.major!!.draw?.items?.map(Picture::fromPicture)
-                        ?: moduleDynamic.major.opus?.pics?.map(Picture::fromPicture))
+                    images = (moduleDynamic.major?.draw?.items?.map(Picture::fromPicture)
+                        ?: moduleDynamic.major?.opus?.pics?.map(Picture::fromPicture))
                         ?.distinctBy { it.url }
                         ?: emptyList()
                 )
@@ -753,17 +753,22 @@ data class DynamicVideo(
     val title: String,
     val cover: String,
     val author: String,
+    var authorId: Long = 0,
+    var authorFace: String = "",
     val duration: Int,
-    val play: Int,
+    val play: Long,
     val danmaku: Int,
     val avatar: String,
     val time: Long = 0L,
     val pubTime: String? = null,
+    val isChargingArc: Boolean = false,
+    val chargingArcBadge: String = ""
 ) {
     companion object {
         fun fromDynamicVideoItem(item: dev.aaa1115910.biliapi.http.entity.dynamic.DynamicItem): DynamicVideo {
             val archive = item.modules.moduleDynamic.major!!.archive!!
             val author = item.modules.moduleAuthor
+            val isChargingArc = archive.badge.text.contains("充电") || archive.badge.text.contains("限时免费")
             return DynamicVideo(
                 aid = archive.aid.toLong(),
                 bvid = archive.bvid,
@@ -772,11 +777,15 @@ data class DynamicVideo(
                     .replace("动态视频｜", ""),
                 cover = archive.cover,
                 author = author.name,
+                authorId = author.mid,
+                authorFace = author.face,
                 duration = convertStringTimeToSeconds(archive.durationText),
                 play = convertStringPlayCountToNumberPlayCount(archive.stat.play),
-                danmaku = convertStringPlayCountToNumberPlayCount(archive.stat.danmaku),
+                danmaku = convertStringPlayCountToNumberPlayCount(archive.stat.danmaku).toInt(),
                 avatar = author.face,
-                pubTime = author.pubTime
+                pubTime = author.pubTime,
+                isChargingArc = isChargingArc,
+                chargingArcBadge = if (isChargingArc) archive.badge.text else ""
             )
         }
 
@@ -800,9 +809,11 @@ data class DynamicVideo(
                         },
                         cover = archive.cover,
                         author = author.name,
+                        authorId = author.mid,
+                        authorFace = author.face,
                         duration = convertStringTimeToSeconds(archive.coverLeftText1),
                         play = convertStringPlayCountToNumberPlayCount(archive.coverLeftText2),
-                        danmaku = convertStringPlayCountToNumberPlayCount(archive.coverLeftText3),
+                        danmaku = convertStringPlayCountToNumberPlayCount(archive.coverLeftText3).toInt(),
                         avatar = author.face
                     )
                 }
@@ -820,7 +831,7 @@ data class DynamicVideo(
                         author = author.name,
                         duration = convertStringTimeToSeconds(pgc.coverLeftText1),
                         play = convertStringPlayCountToNumberPlayCount(pgc.coverLeftText2),
-                        danmaku = convertStringPlayCountToNumberPlayCount(pgc.coverLeftText3),
+                        danmaku = convertStringPlayCountToNumberPlayCount(pgc.coverLeftText3).toInt(),
                         avatar = author.face
                     )
                 }
@@ -836,7 +847,7 @@ data class DynamicVideo(
                         author = author.name,
                         duration = convertStringTimeToSeconds(chargingArchiveInfo.coverLeftText1),
                         play = convertStringPlayCountToNumberPlayCount(chargingArchiveInfo.coverLeftText2),
-                        danmaku = convertStringPlayCountToNumberPlayCount(chargingArchiveInfo.coverLeftText3),
+                        danmaku = convertStringPlayCountToNumberPlayCount(chargingArchiveInfo.coverLeftText3).toInt(),
                         avatar = author.face
                     )
                 }
@@ -862,7 +873,7 @@ private fun convertStringTimeToSeconds(time: String): Int {
 }
 
 //web 接口获取到的是“xx万”，而 grpc 接口获取到的是“xx.x万播放”
-private fun convertStringPlayCountToNumberPlayCount(play: String): Int {
+private fun convertStringPlayCountToNumberPlayCount(play: String): Long {
     if (play.startsWith("-")) return 0
     runCatching {
         val number = play
@@ -870,7 +881,7 @@ private fun convertStringPlayCountToNumberPlayCount(play: String): Int {
             .replace("观看", "")
             .replace("播放", "")
             .substringBefore("万").toFloat()
-        return (if (play.contains("万")) number * 10000 else number).toInt()
+        return (if (play.contains("万")) number * 10000 else number).toLong()
     }.onFailure {
         println("convert play count [$play] failed: ${it.stackTraceToString()}")
     }

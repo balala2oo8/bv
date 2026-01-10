@@ -62,6 +62,20 @@ class VideoDetailRepository(
                     var isFavoured = false
                     var isCoined = false
 
+//                    if (withUserActions) {
+//                        // 检查点赞、收藏、投币状态
+//                        runCatching {
+//                            val archiveRelation = BiliHttpApi.getArchiveRelation(
+//                                avid = aid,
+//                                sessData = authRepository.sessionData ?: ""
+//                            ).getResponseData()
+//                            isLiked = archiveRelation.like
+//                            isCoined = archiveRelation.coin > 0
+//                            isFavoured = archiveRelation.favorite
+//                        }.onFailure {
+//                            println("Check video relation failed: $it")
+//                        }
+//                    }
                     if (withUserActions) {
                         // 串行执行：检查点赞状态
                         isLiked = runCatching {
