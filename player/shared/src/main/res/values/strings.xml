@@ -39,11 +39,13 @@
     <string name="video_aspect_ratio_default">默认</string>
     <string name="video_aspect_ratio_four_to_three">4:3</string>
     <string name="video_aspect_ratio_sixteen_to_nine">16:9</string>
+    <string name="video_aspect_ratio_nine_to_sixteen">9:16</string>
     <string name="video_codec_av1" tools:ignore="Typos">AV1</string>
     <string name="video_codec_avc">H.264</string>
     <string name="video_codec_dvh1" tools:ignore="Typos">Dolby Vision (DVH1)</string>
     <string name="video_codec_hevc">H.265</string>
     <string name="video_codec_hvc1" tools:ignore="Typos">Dolby Vision (HVC1)</string>
+    <string name="video_player_menu_danmaku_rolling_duration_factor">弹幕速度</string>
     <string name="video_player_menu_danmaku_area">显示区域</string>
     <string name="video_player_menu_danmaku_mask">防遮挡</string>
     <string name="video_player_menu_danmaku_opacity">不透明度</string>
@@ -65,9 +67,9 @@
     <string name="video_player_menu_picture_resolution">清晰度</string>
     <string name="video_player_menu_picture_rotation">画面旋转</string>
     <string name="video_rotation_original">原始</string>
-    <string name="video_rotation_90">90°</string>
+    <string name="video_rotation_90">+90°</string>
     <string name="video_rotation_negative_90">-90°</string>
-    <string name="video_rotation_180">180°</string>
+    <string name="video_rotation_180">+180°</string>
     <string name="video_player_menu_subtitle_background_opacity">背景不透明度</string>
     <string name="video_player_menu_subtitle_bottom_padding">底部间距</string>
     <string name="video_player_menu_subtitle_size">字体大小</string>

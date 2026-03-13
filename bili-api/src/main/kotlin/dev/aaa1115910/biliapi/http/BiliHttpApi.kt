@@ -68,6 +68,7 @@ import dev.aaa1115910.biliapi.http.entity.video.TimelineAppData
 import dev.aaa1115910.biliapi.http.entity.video.VideoDetail
 import dev.aaa1115910.biliapi.http.entity.video.VideoInfo
 import dev.aaa1115910.biliapi.http.entity.video.VideoMoreInfo
+import dev.aaa1115910.biliapi.http.entity.video.VideoOnlineTotal
 import dev.aaa1115910.biliapi.http.entity.video.VideoShot
 import dev.aaa1115910.biliapi.http.entity.web.NavResponseData
 import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
@@ -77,7 +78,6 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
-import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -137,9 +137,7 @@ object BiliHttpApi {
 
     private fun createClient() {
         client = HttpClient(OkHttp) {
-            install(UserAgent) {
-                agent = USER_AGENT_WEB
-            }
+            BiliUserAgent()
             install(ContentNegotiation) {
                 json(json)
             }
@@ -707,6 +705,20 @@ object BiliHttpApi {
     }
 
     /**
+     * 获取视频在线观看人数
+     */
+    suspend fun getVideoOnlineTotal(
+        cid: Long,
+        bvid: String? = null,
+        aid: Long? = null
+    ): BiliResponse<VideoOnlineTotal> = client.get("/x/player/online/total") {
+        require(bvid != null || aid != null) { "bvid and aid cannot be null at the same time" }
+        parameter("cid", cid)
+        bvid?.let { parameter("bvid", it) }
+        aid?.let { parameter("aid", it) }
+    }.body()
+
+    /**
      * 检查视频[avid]或[bvid]是否已点赞&收藏&投币
      */
     suspend fun getArchiveRelation(
@@ -817,20 +829,21 @@ object BiliHttpApi {
     ): Pair<Boolean, String> {
         checkToken(accessKey, sessData)
         require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
-        val response = client.post("/x/web-interface/coin/add") {
+//        val response = client.post("/x/web-interface/coin/add") {
+        val response = client.post("https://app.bilibili.com/x/v2/view/coin/add") {
             setBody(FormDataContent(
                 Parameters.build {
                     avid?.let { append("aid", "$it") }
                     bvid?.let { append("bvid", it) }
                     append("multiply", "$multiply")
                     append("select_like", "${if (like) 1 else 0}")
-                    csrf?.let { append("csrf", it) }
+//                    csrf?.let { append("csrf", it) }
                     accessKey?.let { append("access_key", it) }
                 }
             ))
-            if (sessData != null && buvid3 != null) {
-                header("Cookie", "SESSDATA=$sessData;buvid3=$buvid3")
-            }
+//            if (sessData != null && buvid3 != null) {
+//                header("Cookie", "SESSDATA=$sessData;buvid3=$buvid3")
+//            }
         }.body<BiliResponse<AddCoin>>()
         return Pair(response.code == 0, response.message)
     }

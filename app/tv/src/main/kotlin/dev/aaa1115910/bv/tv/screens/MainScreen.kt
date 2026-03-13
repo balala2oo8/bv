@@ -16,11 +16,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +39,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.tv.component.UserPanel
 import dev.aaa1115910.bv.tv.activities.settings.SettingsActivity
@@ -49,6 +52,7 @@ import dev.aaa1115910.bv.tv.activities.user.UserInfoActivity
 import dev.aaa1115910.bv.tv.screens.main.DrawerContent
 import dev.aaa1115910.bv.tv.screens.main.DrawerItem
 import dev.aaa1115910.bv.tv.screens.main.HomeContent
+import dev.aaa1115910.bv.tv.screens.main.LiveContent
 import dev.aaa1115910.bv.tv.screens.main.PgcContent
 import dev.aaa1115910.bv.tv.screens.main.UgcContent
 import dev.aaa1115910.bv.tv.screens.main.currentSelectedTabs
@@ -60,7 +64,11 @@ import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.viewmodel.UserViewModel
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun MainScreen(
@@ -78,7 +86,23 @@ fun MainScreen(
     val mainFocusRequester = remember { FocusRequester() }
     val ugcFocusRequester = remember { FocusRequester() }
     val pgcFocusRequester = remember { FocusRequester() }
+    val liveFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = remember { FocusRequester() }
+
+    // 时间显示状态
+    var currentTime by remember {
+        val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        mutableStateOf(dateFormat.format(Date()))
+    }
+
+    // 定时更新时间
+    LaunchedEffect(Unit) {
+        val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+        while (true) {
+            delay(60_000L - System.currentTimeMillis() % 60_000L)
+            currentTime = dateFormat.format(Date())
+        }
+    }
 
     val handleBack = {
         val currentTime = System.currentTimeMillis()
@@ -97,16 +121,17 @@ fun MainScreen(
             DrawerItem.Home -> mainFocusRequester.requestFocus()
             DrawerItem.UGC -> ugcFocusRequester.requestFocus()
             DrawerItem.PGC -> pgcFocusRequester.requestFocus()
+            DrawerItem.Live -> liveFocusRequester.requestFocus()
             DrawerItem.Search -> searchFocusRequester.requestFocus()
             else -> {
                 // 搜索+右侧是搜索->用户+用户内容不是放右侧的，右侧还是搜索。
                 // 让内容对应的菜单获得焦点
                 drawerItemFocusRequesters[selectedDrawerItem]?.requestFocus()
-                // 让右侧内容获得焦点
                 when (selectedDrawerItem) {
                     DrawerItem.Home -> mainFocusRequester.requestFocus()
                     DrawerItem.UGC -> ugcFocusRequester.requestFocus()
                     DrawerItem.PGC -> pgcFocusRequester.requestFocus()
+                    DrawerItem.Live -> liveFocusRequester.requestFocus()
                     DrawerItem.Search -> searchFocusRequester.requestFocus()
                     else -> {}
                 }
@@ -199,10 +224,25 @@ fun MainScreen(
                     DrawerItem.Home -> HomeContent(navFocusRequester = mainFocusRequester)
                     DrawerItem.UGC -> UgcContent(navFocusRequester = ugcFocusRequester)
                     DrawerItem.PGC -> PgcContent(navFocusRequester = pgcFocusRequester)
+                    DrawerItem.Live -> LiveContent(navFocusRequester = liveFocusRequester)
                     DrawerItem.Search -> SearchInputScreen(defaultFocusRequester = searchFocusRequester)
                     else -> {}
                 }
             }
+
+            // 右上角时间显示
+            Text(
+                text = currentTime,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = 8.dp, top = 0.dp)
+                    .offset(y=(-2).dp),
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 13.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
             // Box(
             //     modifier = Modifier
             //         .fillMaxSize()

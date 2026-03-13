@@ -1,6 +1,5 @@
 package dev.aaa1115910.bv.player.tv.controller
 
-import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -24,7 +23,6 @@ import androidx.tv.material3.MaterialTheme
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekState
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekThumbData
-import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
 import dev.aaa1115910.bv.player.seekbar.SeekMoveState
 import dev.aaa1115910.bv.player.tv.VideoSeekBar
@@ -39,7 +37,6 @@ fun SeekController(
     val videoPlayerVideoShotData = LocalVideoPlayerVideoShotData.current
     val videoPlayerSeekState = LocalVideoPlayerSeekState.current
     val videoPlayerSeekThumbData = LocalVideoPlayerSeekThumbData.current
-    val videoPlayerStateData = LocalVideoPlayerStateData.current
 
     Box(
         modifier = modifier.fillMaxSize()
@@ -103,14 +100,15 @@ private fun SeekController(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 8.dp, bottom = 2.dp),
+                    .padding(top = 8.dp, bottom = 16.dp),
                 duration = duration,
                 position = position,
                 bufferedPercentage = 1,
                 moveState = moveState,
                 idleIcon = idleIcon,
                 movingIcon = movingIcon,
-                showPosition = true
+                showPosition = true,
+                strokeWidth = 6.dp
             )
         }
     }

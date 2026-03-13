@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskSegment
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
 import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
@@ -53,6 +54,7 @@ data class VideoPlayerVideoInfoData(
     val fromSeason: Boolean = false,
     val isFollowingUp: Boolean = false,
     val isVerticalVideo: Boolean = false,
+    val isLive: Boolean = false
 )
 
 data class VideoPlayerClockData(
@@ -120,6 +122,7 @@ data class VideoPlayerConfigData(
     val currentDanmakuOpacity: Float = 1f,
     val currentDanmakuArea: Float = 1f,
     val currentDanmakuMask: Boolean = false,
+    val currentDanmakuRollingDurationFactor: Float = 1f,
     val currentSubtitleId: Long = 0,
     val currentSubtitleData: List<SubtitleItem> = emptyList(),
     val currentSubtitleFontSize: TextUnit = 24.sp,
@@ -131,6 +134,14 @@ data class VideoPlayerConfigData(
     var showDanmaku: Boolean = true,
     var showRelatedVideos: Boolean = false,
     var showNextVideoBtn: Boolean = false,
+    val defaultStartPosition: DefaultStartPosition = DefaultStartPosition.History,
+    val clipInfoList: List<ClipInfo> = emptyList(),
+    val skipPgcIntroOutro: Boolean = false,
+    val isLive: Boolean = false,
+    val availableLiveQualities: List<Pair<Int, String>> = emptyList(),
+    val currentLiveQn: Int = 0,
+    val currentLiveQualityDescription: String = "",
+    val controllerButtonsOrder: String = "",
 )
 
 data class VideoPlayerDanmakuMasksData(

@@ -6,7 +6,11 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
 import java.lang.ref.WeakReference
+import java.util.LinkedList
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.entity.PlayerType
@@ -24,7 +28,49 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 class VideoPlayerV3Activity : ComponentActivity() {
     companion object {
         private val logger = KotlinLogging.logger { }
-        private var currentInstance: WeakReference<VideoPlayerV3Activity>? = null
+        // 使用WeakReference防止内存泄漏，避免持有已销毁Activity的强引用
+        private val activityQueue = LinkedList<WeakReference<VideoPlayerV3Activity>>()
+
+        private fun formatPopularity(count: Int): String {
+            return when {
+                count >= 100_000_000 -> String.format("%.1f亿人气", count / 100_000_000.0)
+                count >= 10_000 -> String.format("%.1f万人气", count / 10_000.0)
+                else -> "${count}人气"
+            }
+        }
+        
+        /**
+         * 启动直播播放
+         */
+        fun actionStartLive(
+            context: Context,
+            roomId: Int,
+            title: String,
+            upName: String = "",
+            watchedNum: Int = 0,
+            upId: Long = 0L,
+            upFace: String = ""
+        ) {
+            val runtime = Runtime.getRuntime()
+            val usedMemory = runtime.totalMemory() - runtime.freeMemory()
+            val maxMemory = runtime.maxMemory()
+            logger.info { "Current memory usage VideoPlayerV3Activity.actionStartLive: ${usedMemory / 1024 / 1024} MB / ${maxMemory / 1024 / 1024} MB" }
+
+            context.startActivity(
+                Intent(
+                    context,
+                    VideoPlayerV3Activity::class.java
+                ).apply {
+                    putExtra("isLive", true)
+                    putExtra("liveRoomId", roomId)
+                    putExtra("title", title)
+                    putExtra("upName", upName)
+                    putExtra("liveWatchedNum", watchedNum)
+                    putExtra("upId", upId)
+                    putExtra("upFace", upFace)
+                }
+            )
+        }
         
         fun actionStart(
             context: Context,
@@ -57,13 +103,6 @@ class VideoPlayerV3Activity : ComponentActivity() {
             val maxMemory = runtime.maxMemory()
             logger.info { "Current memory usage VideoPlayerV3Activity.actionStart: ${usedMemory / 1024 / 1024} MB / ${maxMemory / 1024 / 1024} MB" }
 
-            // 先关闭旧的播放页面
-            currentInstance?.get()?.let { instance ->
-                logger.info { "Closing previous video player instance" }
-                instance.finish()
-            }
-            currentInstance = null
-            
             context.startActivity(
                 Intent(
                     context,
@@ -101,8 +140,36 @@ class VideoPlayerV3Activity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 设置当前实例为弱引用
-        currentInstance = WeakReference(this)
+        // 将当前活动加入队列
+        synchronized(activityQueue) {
+            val maxVideoPlayerScreens = if (Prefs.showUGCVideoInfo) {
+                1
+            } else {
+                Prefs.ugcVideoPlayerHistoryCount.coerceAtLeast(1)
+            }
+
+            // 清理队列中的无效引用
+            val iterator = activityQueue.iterator()
+            while (iterator.hasNext()) {
+                val activityRef = iterator.next()
+                val activity = activityRef.get()
+                if (activity == null || activity.isFinishing) {
+                    iterator.remove()
+                }
+            }
+
+            // 添加当前活动到队列
+            activityQueue.add(WeakReference(this))
+
+            // 如果队列超过了最大限制，关闭最早的活动
+            if (activityQueue.size > maxVideoPlayerScreens) {
+                val oldestActivityRef = activityQueue.removeFirst()
+                val oldestActivity = oldestActivityRef.get()
+                oldestActivity?.runOnUiThread {
+                    oldestActivity.finish()
+                }
+            }
+        }
 
         initVideoPlayer()
         //initDanmakuPlayer()
@@ -121,9 +188,22 @@ class VideoPlayerV3Activity : ComponentActivity() {
         super.onDestroy()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        // 清除当前实例引用
-        if (currentInstance?.get() == this) {
-            currentInstance = null
+        // 显式释放播放器资源，避免依赖 ViewModel.onCleared() 的延迟回调
+        playerViewModel.videoPlayer?.release()
+        if (isFinishing) {
+            playerViewModel.videoPlayer = null
+            playerViewModel.danmakuPlayer = null
+        }
+
+        // 当活动被销毁时，从队列中移除该Activity的引用
+        synchronized(activityQueue) {
+            val iterator = activityQueue.iterator()
+            while (iterator.hasNext()) {
+                val ref = iterator.next()
+                if (ref.get() == this || ref.get() == null) {
+                    iterator.remove()
+                }
+            }
         }
 
         // 获取当前内存信息并打印到控制台
@@ -137,6 +217,11 @@ class VideoPlayerV3Activity : ComponentActivity() {
         super.onPause()
         playerViewModel.videoPlayer?.pause()
         playerViewModel.danmakuPlayer?.pause()
+        
+        // 暂停直播弹幕
+        if (playerViewModel.isLive) {
+            playerViewModel.stopLiveDanmaku()
+        }
     }
 
     private fun initVideoPlayer() {
@@ -150,7 +235,10 @@ class VideoPlayerV3Activity : ComponentActivity() {
                 ApiType.Web -> getString(R.string.video_player_referer)
                 ApiType.App -> null
             },
-            enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer
+            enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
+            enableAsyncQueueing = Prefs.enableAsyncQueueing,
+            enableTunneling = Prefs.enableTunneling,
+            showDebugInfo = Prefs.playerShowDebugInfo
         )
         val videoPlayer = when (Prefs.playerType) {
             PlayerType.Media3 -> ExoPlayerFactory().create(this, options)
@@ -164,6 +252,32 @@ class VideoPlayerV3Activity : ComponentActivity() {
     }*/
 
     private fun getParamsFromIntent() {
+        // 检查是否为直播模式
+        if (intent.getBooleanExtra("isLive", false)) {
+            val roomId = intent.getIntExtra("liveRoomId", 0)
+            val title = intent.getStringExtra("title") ?: "Unknown Title"
+            val upName = intent.getStringExtra("upName") ?: ""
+            val watchedNum = intent.getIntExtra("liveWatchedNum", 0)
+            val upId = intent.getLongExtra("upId", 0L)
+            val upFace = intent.getStringExtra("upFace") ?: ""
+
+            logger.fInfo { "Launch live parameter: [roomId=$roomId, watchedNum=$watchedNum]" }
+            
+            playerViewModel.apply {
+                this.title = title
+                this.upName = upName
+                this.upId = upId
+                this.upFace = upFace
+                this.isLive = true
+                this.liveRoomId = roomId
+                this.livePopularityText = if (watchedNum > 0) formatPopularity(watchedNum) else ""
+                
+                // 通过 ViewModel 加载直播流（带画质选择，加载成功后自动启动弹幕）
+                loadLiveStreamWithQuality(roomId)
+            }
+            return
+        }
+        
         if (intent.hasExtra("avid")) {
             val aid = intent.getLongExtra("avid", 170001)
             val cid = intent.getLongExtra("cid", 170001)
@@ -189,6 +303,8 @@ class VideoPlayerV3Activity : ComponentActivity() {
             val pubTime = intent.getStringExtra("pubTime") ?: ""
             dev.aaa1115910.bv.tv.activities.video.VideoPlayerV3Activity.Companion.logger.fInfo { "Launch parameter: [aid=$aid, cid=$cid]" }
             playerViewModel.apply {
+                // lastPlayed 需要在 loadPlayUrl 之前设置，以便 prepare() 时能正确设置初始跳转位置
+                this.lastPlayed = played
                 loadPlayUrl(
                     avid = aid,
                     cid = cid,
@@ -196,7 +312,6 @@ class VideoPlayerV3Activity : ComponentActivity() {
                 )
                 this.title = title
                 this.partTitle = partTitle
-                this.lastPlayed = played
                 this.fromSeason = fromSeason
                 this.subType = subType
                 this.epid = epid

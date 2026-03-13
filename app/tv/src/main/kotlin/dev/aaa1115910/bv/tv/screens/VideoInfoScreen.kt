@@ -77,7 +77,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,6 +125,7 @@ import dev.aaa1115910.bv.tv.activities.video.SeasonInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.TagActivity
 import dev.aaa1115910.bv.tv.activities.video.UpInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.VideoInfoActivity
+import dev.aaa1115910.bv.tv.component.CommentPanel
 import dev.aaa1115910.bv.tv.component.LoadingTip
 import dev.aaa1115910.bv.tv.component.TvAlertDialog
 import dev.aaa1115910.bv.tv.component.UpIcon
@@ -190,6 +194,10 @@ fun VideoInfoScreen(
     // 添加用于管理简介对话框的状态
     var showDescriptionDialog by remember { mutableStateOf(false) }
 
+    // 添加用于管理评论浮层的状态
+    var showCommentPanel by remember { mutableStateOf(false) }
+    val commentButtonFocusRequester = remember { FocusRequester() }
+
     var lastPlayedCid by remember { mutableLongStateOf(0) }
     var lastPlayedTime by remember { mutableIntStateOf(0) }
 
@@ -199,6 +207,7 @@ fun VideoInfoScreen(
     var fromPlayer by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
     var proxyArea by remember { mutableStateOf(ProxyArea.MainLand) }
+    var intentAid by remember { mutableLongStateOf(0L) }
 
     val containsVerticalScreenVideo by remember {
         derivedStateOf {
@@ -324,7 +333,7 @@ fun VideoInfoScreen(
             val success =
                 VideoUserActionManager.updateVideoFavoriteFolders(aid, folderIds, Prefs.uid)
             if (!success) {
-                "收藏操作失败".toast(context)
+                "收藏操作失败！此收藏夹收藏数量已达上限（1000）".toast(context)
             }
         }
     }
@@ -333,7 +342,7 @@ fun VideoInfoScreen(
         scope.launch {
             val success = VideoUserActionManager.addToDefaultFavoriteFolder(aid, Prefs.uid)
             if (!success) {
-                "添加收藏失败".toast(context)
+                "添加收藏失败！默认收藏夹不存在？".toast(context)
             }
         }
     }
@@ -410,6 +419,7 @@ fun VideoInfoScreen(
     LaunchedEffect(Unit) {
         if (intent.hasExtra("aid")) {
             val aid = intent.getLongExtra("aid", 170001)
+            intentAid = aid
             var cid = intent.getLongExtra("cid", 0)
             fromSeason = intent.getBooleanExtra("fromSeason", false)
             fromPlayer = intent.getBooleanExtra("fromPlayer", false)
@@ -454,6 +464,7 @@ fun VideoInfoScreen(
                     // 从播放器推荐视频打开时 fromPlayer=true 并显示loading。300m后 fromPlayer改成false，此后从播放器返回详情页，正常显示详情内容
                     //如果是从剧集跳转过来的或设置不显示视频详情，就直接播放 P1
                     if (fromSeason || !showUGCVideoInfo || fromPlayer) {
+                        val shouldFinishAfterAutoLaunch = fromPlayer && !Prefs.videoInfoHistoryIncludeFromPlayer
                         val playPart = videoDetailViewModel.videoDetail!!.pages.first()
                         cid = cid.takeIf { it > 0L } ?: playPart.cid
 
@@ -490,7 +501,9 @@ fun VideoInfoScreen(
                                 pubTime = videoDetailViewModel.videoDetail!!.publishDate.formatPubTimeString()
                             )
                         }
-                        if (fromPlayer) {
+                        if (shouldFinishAfterAutoLaunch) {
+                            context.finish()
+                        } else if (fromPlayer) {
                             // 清除标记, 以便从播放器返回过来的可以进入详情页
                             scope.launch {
                                 delay(1200)
@@ -612,7 +625,7 @@ fun VideoInfoScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface),
+                .ifElse(!showUGCVideoInfo, Modifier.background(Color.Black)),
             contentAlignment = Alignment.Center
         ) {
             if (tip == "Loading") {
@@ -860,7 +873,11 @@ fun VideoInfoScreen(
                             },
                             onShowDescription = {
                                 showDescriptionDialog = true
-                            }
+                            },
+                            onShowComment = {
+                                showCommentPanel = true
+                            },
+                            commentButtonFocusRequester = commentButtonFocusRequester
                         )
                     }
                     if (videoDetailViewModel.videoDetail?.ugcSeason == null) {
@@ -906,6 +923,7 @@ fun VideoInfoScreen(
                                 episodes = section.episodes,
                                 lastPlayedCid = lastPlayedCid,
                                 lastPlayedTime = lastPlayedTime,
+                                intentAid = intentAid,
                                 enableUgcListDialog = section.episodes.size > 5,
                                 onClickEp = { aid, cid ->
                                     logger.fInfo { "Click ugc season episode: [av:${videoDetailViewModel.videoDetail?.aid}, bv:${videoDetailViewModel.videoDetail?.bvid}, cid:$cid]" }
@@ -1003,6 +1021,41 @@ fun VideoInfoScreen(
         onHideDialog = { showDescriptionDialog = false },
         description = videoDetailViewModel.videoDetail?.description ?: ""
     )
+
+    // 计算评论面板的初始 episode id（用于 UGC 合集）
+    val commentInitialEpisodeId = remember(lastPlayedCid, intentAid, videoDetailViewModel.videoDetail?.ugcSeason) {
+        val sections = videoDetailViewModel.videoDetail?.ugcSeason?.sections ?: return@remember -1
+        val allEpisodes = sections.flatMap { it.episodes }
+
+        // 优先使用历史记录对应的 episode
+        if (lastPlayedCid != 0L) {
+            allEpisodes.find { ep ->
+                ep.cid == lastPlayedCid || ep.pages.any { it.cid == lastPlayedCid }
+            }?.id?.let { return@remember it }
+        }
+
+        // 没有历史记录时，使用与 intentAid 匹配的 episode
+        if (intentAid != 0L) {
+            allEpisodes.find { it.aid == intentAid }?.id?.let { return@remember it }
+        }
+
+        -1
+    }
+
+    CommentPanel(
+        show = showCommentPanel,
+        oid = videoDetailViewModel.videoDetail?.aid ?: 0L,
+        onHide = { showCommentPanel = false },
+        sections = videoDetailViewModel.videoDetail?.ugcSeason?.sections ?: emptyList(),
+        initialEpisodeId = commentInitialEpisodeId
+    )
+
+    // 浮层关闭后，焦点返回评论按钮
+    LaunchedEffect(showCommentPanel) {
+        if (!showCommentPanel) {
+            commentButtonFocusRequester.requestFocus()
+        }
+    }
 }
 
 @Composable
@@ -1062,7 +1115,9 @@ fun VideoInfoData(
     onDelLike: () -> Unit = {},
     isCoin: Boolean = false,
     onAddCoin: () -> Unit = {},
-    onShowDescription: () -> Unit = {}
+    onShowDescription: () -> Unit = {},
+    onShowComment: () -> Unit = {},
+    commentButtonFocusRequester: FocusRequester
 ) {
 //    val localDensity = LocalDensity.current
 //    var heightIs by remember { mutableStateOf(0.dp) }
@@ -1297,6 +1352,26 @@ fun VideoInfoData(
                             }
                         }
                     }
+
+                    // 评论按钮
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .clip(MaterialTheme.shapes.small)
+                                .background(Color.White.copy(alpha = 0.2f))
+                                .focusedBorder(MaterialTheme.shapes.small)
+                                .padding(horizontal = 4.dp)
+                                .focusRequester(commentButtonFocusRequester)
+                                .clickable { onShowComment() }
+                                .height(30.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "评论>>",
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
             // 标签列表
@@ -1457,9 +1532,22 @@ private fun VideoPartButton(
     title: String,
     duration: Int,
     played: Int = 0,
+    isLastPlayed: Boolean = false,
+    isCurrentIntent: Boolean = false,
     type: VideoPartType = VideoPartType.Part,
     onClick: () -> Unit
 ) {
+    val borderColor = when {
+        isLastPlayed -> null
+        isCurrentIntent -> MaterialTheme.colorScheme.primary
+        else -> null
+    }
+    val focusedBorderColor = when {
+        isLastPlayed -> null
+        isCurrentIntent -> Color(0xFF00BFFF)
+        else -> null
+    }
+
     Surface(
         modifier = modifier,
         colors = ClickableSurfaceDefaults.colors(
@@ -1467,7 +1555,28 @@ private fun VideoPartButton(
             focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
             pressedContainerColor = MaterialTheme.colorScheme.inverseSurface
         ),
+        scale = ClickableSurfaceDefaults.scale(scale = 1f, focusedScale = 1f),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
+        border = ClickableSurfaceDefaults.border(
+            border = borderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None,
+            focusedBorder = focusedBorderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None,
+            pressedBorder = focusedBorderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None
+        ),
         onClick = { onClick() }
     ) {
         Box(
@@ -1476,17 +1585,24 @@ private fun VideoPartButton(
         ) {
             Box(
                 modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.2f))
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .fillMaxHeight()
                     .fillMaxWidth(if (played < 0) 1f else (played / duration.toFloat()))
             ) {}
             Text(
                 modifier = Modifier
                     .padding(8.dp),
-                text = when (type) {
-                    VideoPartType.Episode -> "EP"
-                    VideoPartType.Part -> "P"
-                } + "$index $title",
+                text = buildAnnotatedString {
+                    if (isLastPlayed) {
+                        withStyle(style = SpanStyle(color = Color(0xFFE39B17))) {
+                            append("继续播放 ")
+                        }
+                    }
+                    append(when (type) {
+                        VideoPartType.Episode -> "EP"
+                        VideoPartType.Part -> "P"
+                    } + "$index $title")
+                },
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1501,25 +1617,41 @@ private enum class VideoPartType {
 @Composable
 private fun VideoPartRowButton(
     modifier: Modifier = Modifier,
+    hasFocus: Boolean = true,
     onClick: () -> Unit
 ) {
+    val scale by animateFloatAsState(
+        targetValue = if (hasFocus) 1f else 0.4f,
+        label = "button scale",
+        animationSpec = tween(
+            durationMillis = 120
+        )
+    )
+
     Surface(
-        modifier = modifier.height(64.dp),
+        modifier = modifier,
         colors = ClickableSurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
             pressedContainerColor = MaterialTheme.colorScheme.inverseSurface
         ),
-        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
+        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, Color(0xFFE39B17)),
+                shape = MaterialTheme.shapes.small
+            )
+        ),
         onClick = onClick
     ) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .size(width = (40 * scale).dp, height = (42 * scale).dp),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(32.dp)
                     .rotate(90f),
                 imageVector = Icons.Rounded.ViewModule,
                 contentDescription = null
@@ -1542,6 +1674,7 @@ fun VideoPartRow(
     val focusRequester = remember { FocusRequester() }
     var hasFocus by remember { mutableStateOf(false) }
     var showPartListDialog by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     val titleFontSize by animateFloatAsState(
         targetValue = if (hasFocus) 30f else 14f,
         label = "title font size",
@@ -1550,36 +1683,50 @@ fun VideoPartRow(
         )
     )
 
+    // 滚动到有历史记录的那一集
+    LaunchedEffect(lastPlayedCid, pages) {
+        if (lastPlayedCid != 0L && pages.isNotEmpty()) {
+            val index = pages.indexOfFirst { it.cid == lastPlayedCid }
+            if (index > 0) {
+                listState.scrollToItem(index)
+            }
+        }
+    }
+
     Column(
         modifier = modifier
             .ifElse(!nested, Modifier.padding(start = 26.dp))
             .onFocusChanged { hasFocus = it.hasFocus },
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            modifier = Modifier
-                .padding(start = 10.dp),
-            text = stringResource(R.string.video_info_part_row_title)
-                    + (" - $subtitle".takeIf { subtitle.isNotBlank() } ?: ""),
-            fontSize = titleFontSize.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            modifier = Modifier.padding(start = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.video_info_part_row_title)
+                        + (" - $subtitle".takeIf { subtitle.isNotBlank() } ?: ""),
+                fontSize = titleFontSize.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (enablePartListDialog) {
+                VideoPartRowButton(
+                    hasFocus = hasFocus,
+                    onClick = { showPartListDialog = true }
+                )
+            }
+        }
 
         LazyRow(
             modifier = Modifier
                 .padding(top = 4.dp)
                 .focusRestorer(focusRequester),
+            state = listState,
             contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (enablePartListDialog) {
-                item {
-                    VideoPartRowButton(
-                        onClick = { showPartListDialog = true }
-                    )
-                }
-            }
             itemsIndexed(items = pages, key = { _, page -> page.cid }) { index, page ->
                 VideoPartButton(
                     modifier = Modifier
@@ -1587,6 +1734,7 @@ fun VideoPartRow(
                     index = index + 1,
                     title = page.title,
                     played = if (page.cid == lastPlayedCid) lastPlayedTime else 0,
+                    isLastPlayed = page.cid == lastPlayedCid,
                     duration = page.duration,
                     onClick = { onClick(page.cid) }
                 )
@@ -1598,6 +1746,8 @@ fun VideoPartRow(
         show = showPartListDialog,
         onHideDialog = { showPartListDialog = false },
         pages = pages,
+        lastPlayedCid = lastPlayedCid,
+        lastPlayedTime = lastPlayedTime,
         title = "分 P 列表",
         onClick = onClick
     )
@@ -1610,6 +1760,7 @@ fun VideoUgcSeasonRow(
     episodes: List<Episode>,
     lastPlayedCid: Long = 0,
     lastPlayedTime: Int = 0,
+    intentAid: Long = 0,
     enableUgcListDialog: Boolean = false,
     onClickEp: (avid: Long, cid: Long) -> Unit,
     onClickEpPart: (episode: Episode, cid: Long) -> Unit
@@ -1617,6 +1768,7 @@ fun VideoUgcSeasonRow(
     val focusRequester = remember { FocusRequester() }
     var hasFocus by remember { mutableStateOf(false) }
     var showUgcListDialog by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
     val titleFontSize by animateFloatAsState(
         targetValue = if (hasFocus) 30f else 14f,
         label = "title font size",
@@ -1626,33 +1778,56 @@ fun VideoUgcSeasonRow(
     )
     var focusingEpisode by remember { mutableStateOf<Episode?>(null) }
 
+    // 滚动到有历史记录的那一集，如果没有历史记录则滚动到与 intentAid 相同的视频
+    LaunchedEffect(lastPlayedCid, intentAid, episodes) {
+        if (episodes.isEmpty()) return@LaunchedEffect
+
+        val index = if (lastPlayedCid != 0L) {
+            // 优先使用历史记录
+            episodes.indexOfFirst { it.cid == lastPlayedCid || it.pages.any { page -> page.cid == lastPlayedCid } }
+        } else if (intentAid != 0L) {
+            // 没有历史记录时，滚动到与 intentAid 相同的视频
+            episodes.indexOfFirst { it.aid == intentAid }
+        } else {
+            -1
+        }
+
+        if (index > 0) {
+            listState.scrollToItem(index)
+        }
+    }
+
     Column(
         modifier = modifier
             .padding(start = 26.dp)
             .onFocusChanged { hasFocus = it.hasFocus },
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
-            modifier = Modifier
-                .padding(start = 10.dp),
-            text = title,
-            fontSize = titleFontSize.sp
-        )
+        Row(
+            modifier = Modifier.padding(start = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = titleFontSize.sp
+            )
+            if (enableUgcListDialog) {
+                VideoPartRowButton(
+                    hasFocus = hasFocus,
+                    onClick = { showUgcListDialog = true }
+                )
+            }
+        }
 
         LazyRow(
             modifier = Modifier
                 .padding(top = 4.dp)
                 .focusRestorer(focusRequester),
+            state = listState,
             contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (enableUgcListDialog) {
-                item {
-                    VideoPartRowButton(
-                        onClick = { showUgcListDialog = true }
-                    )
-                }
-            }
             itemsIndexed(items = episodes) { index, episode ->
                 VideoPartButton(
                     modifier = Modifier
@@ -1661,6 +1836,8 @@ fun VideoUgcSeasonRow(
                     index = index + 1,
                     title = episode.title,
                     played = if (episode.cid == lastPlayedCid) lastPlayedTime else 0,
+                    isLastPlayed = episode.cid == lastPlayedCid || episode.pages.any { it.cid == lastPlayedCid },
+                    isCurrentIntent = episode.aid == intentAid,
                     duration = episode.duration,
                     type = VideoPartType.Episode,
                     onClick = { onClickEp(episode.aid, episode.cid) }
@@ -1686,6 +1863,9 @@ fun VideoUgcSeasonRow(
         show = showUgcListDialog,
         onHideDialog = { showUgcListDialog = false },
         episodes = episodes,
+        lastPlayedCid = lastPlayedCid,
+        lastPlayedTime = lastPlayedTime,
+        intentAid = intentAid,
         title = "合集列表",
         onClick = onClickEp
     )
@@ -1697,6 +1877,8 @@ private fun VideoPartListDialog(
     show: Boolean,
     title: String,
     pages: List<VideoPage>,
+    lastPlayedCid: Long = 0,
+    lastPlayedTime: Int = 0,
     onHideDialog: () -> Unit,
     onClick: (cid: Long) -> Unit
 ) {
@@ -1794,7 +1976,8 @@ private fun VideoPartListDialog(
                                 modifier = buttonModifier,
                                 index = page.index,
                                 title = page.title,
-                                played = 0,
+                                played = if (page.cid == lastPlayedCid) lastPlayedTime else 0,
+                                isLastPlayed = page.cid == lastPlayedCid,
                                 duration = page.duration,
                                 onClick = { onClick(page.cid) }
                             )
@@ -1812,6 +1995,9 @@ private fun VideoUgcListDialog(
     show: Boolean,
     title: String,
     episodes: List<Episode>,
+    lastPlayedCid: Long = 0,
+    lastPlayedTime: Int = 0,
+    intentAid: Long = 0,
     onHideDialog: () -> Unit,
     onClick: (avid: Long, cid: Long) -> Unit
 ) {
@@ -1910,7 +2096,9 @@ private fun VideoUgcListDialog(
                                 index = selectedTabIndex * 20 + index + 1,
                                 type = VideoPartType.Episode,
                                 title = episode.title,
-                                played = 0,
+                                played = if (episode.cid == lastPlayedCid) lastPlayedTime else 0,
+                                isLastPlayed = episode.cid == lastPlayedCid || episode.pages.any { it.cid == lastPlayedCid },
+                                isCurrentIntent = episode.aid == intentAid,
                                 duration = episode.duration,
                                 onClick = { onClick(episode.aid, episode.cid) }
                             )

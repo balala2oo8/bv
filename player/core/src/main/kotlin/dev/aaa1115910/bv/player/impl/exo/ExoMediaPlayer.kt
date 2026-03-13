@@ -1,6 +1,7 @@
 package dev.aaa1115910.bv.player.impl.exo
 
 import android.content.Context
+import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -15,6 +16,8 @@ import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.OkHttpUtil
 import dev.aaa1115910.bv.player.VideoPlayerOptions
@@ -61,6 +64,17 @@ class ExoMediaPlayer(
             )
             // setMediaCodecSelector(MediaCodecSelector.PREFER_SOFTWARE)
             setEnableDecoderFallback(true)
+            // 为 API 23-30 启用异步缓冲队列（API 31+ 已默认启用）
+            if (options.enableAsyncQueueing && Build.VERSION.SDK_INT >= 23 && Build.VERSION.SDK_INT < 31) {
+                @Suppress("UNCHECKED_CAST")
+                forceEnableMediaCodecAsynchronousQueueing()
+            }
+        }
+
+        val trackSelector = DefaultTrackSelector(context).apply {
+            if (options.enableTunneling) {
+                setParameters(buildUponParameters().setTunnelingEnabled(true).build())
+            }
         }
 
         // 创建智能缓冲策略，根据设备性能和视频质量动态调整
@@ -83,6 +97,7 @@ class ExoMediaPlayer(
         mPlayer = ExoPlayer
             .Builder(context)
             .setRenderersFactory(renderersFactory)
+            .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
             .setSeekForwardIncrementMs(1000 * 10)
             .setSeekBackIncrementMs(1000 * 10)
@@ -102,23 +117,40 @@ class ExoMediaPlayer(
 
     @OptIn(UnstableApi::class)
     override fun playUrl(videoUrl: String?, audioUrl: String?) {
-        val videoMediaSource = videoUrl?.let {
-            ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri(it))
-        }
-        val audioMediaSource = audioUrl?.let {
-            ProgressiveMediaSource.Factory(dataSourceFactory)
-                .createMediaSource(MediaItem.fromUri(it))
-        }
+        val videoMediaSource = videoUrl?.let { createMediaSource(it) }
+        val audioMediaSource = audioUrl?.let { createMediaSource(it) }
 
         val mediaSources = listOfNotNull(videoMediaSource, audioMediaSource)
         mMediaSource = MergingMediaSource(*mediaSources.toTypedArray())
+    }
+
+    /**
+     * 根据 URL 自动选择合适的 MediaSource
+     * - .m3u8 URL 使用 HlsMediaSource（支持 HLS 直播/点播）
+     * - 其他 URL 使用 ProgressiveMediaSource（支持 FLV/MP4 等逐行下载）
+     */
+    @OptIn(UnstableApi::class)
+    private fun createMediaSource(url: String): MediaSource {
+        val uri = android.net.Uri.parse(url)
+        val path = uri.path?.lowercase() ?: ""
+        return if (path.endsWith(".m3u8")) {
+            HlsMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(uri))
+        } else {
+            ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(uri))
+        }
     }
 
     @OptIn(UnstableApi::class)
     override fun prepare() {
         mPlayer?.setMediaSource(mMediaSource!!)
         mPlayer?.prepare()
+        // 处理初始跳转位置，避免在 onReady 中 seek 导致的状态抖动
+        if (pendingSeekPosition > 0) {
+            mPlayer?.seekTo(pendingSeekPosition)
+            clearPendingSeekPosition()
+        }
     }
 
     override fun start() {
@@ -200,10 +232,12 @@ class ExoMediaPlayer(
 
     override val debugInfo: String
         get() {
+            if (!options.showDebugInfo) return ""
             return """
                 player: ${androidx.media3.common.MediaLibraryInfo.VERSION_SLASHY}
                 time: ${currentPosition.formatHourMinSec()} / ${duration.formatHourMinSec()}
                 buffered: $bufferedPercentage%
+                tunneling: ${options.enableTunneling}
                 resolution: ${mPlayer?.videoSize?.width} x ${mPlayer?.videoSize?.height}
                 audio: ${mPlayer?.audioFormat?.bitrate ?: 0} kbps
                 video codec: ${mPlayer?.videoFormat?.sampleMimeType ?: "null"}
@@ -226,6 +260,14 @@ class ExoMediaPlayer(
         get() = mPlayer?.videoSize?.width ?: 0
     override val videoHeight: Int
         get() = mPlayer?.videoSize?.height ?: 0
+
+    override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+        mPlayerEventListener?.onVideoSizeChanged(videoSize.width, videoSize.height)
+    }
+
+    override fun onRenderedFirstFrame() {
+        mPlayerEventListener?.onRenderedFirstFrame()
+    }
 
     override fun onPlayerError(error: PlaybackException) {
         mPlayerEventListener?.onError(error)

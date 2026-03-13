@@ -41,9 +41,11 @@ import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerDebugInfoData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekState
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
+import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
@@ -58,6 +60,7 @@ import dev.aaa1115910.bv.util.toast
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -72,6 +75,8 @@ fun VideoPlayerController(
     showRelatedVideos: Boolean = false,
     onToggleRelatedVideos: (Boolean) -> Unit,
     registerShowInfoProvider: ((() -> Boolean) -> Unit) = {},
+    onViewerCountTipCanShowChanged: (Boolean) -> Unit = {},
+    viewerCountText: String = "",
 
     //player events
     onPlay: () -> Unit,
@@ -100,11 +105,13 @@ fun VideoPlayerController(
     onRotationChange: (VideoRotation) -> Unit,
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
+    onLiveQualityChange: (Int) -> Unit = {},
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
+    onDanmakuRollingDurationFactorChange: (Float) -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
@@ -113,12 +120,15 @@ fun VideoPlayerController(
     onLoadNextVideo: (Boolean) -> Unit,
 
     onRequestFocus: () -> Unit,
+    onShowComment: () -> Unit = {},
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
+    val videoPlayerConfigData = LocalVideoPlayerConfigData.current
     val videoPlayerSeekState = LocalVideoPlayerSeekState.current
     val videoPlayerStateData = LocalVideoPlayerStateData.current
     val videoPlayerDebugInfoData = LocalVideoPlayerDebugInfoData.current
+    val videoPlayerVideoInfoData = LocalVideoPlayerVideoInfoData.current
     val logger = KotlinLogging.logger {}
     val scope = rememberCoroutineScope()
 
@@ -143,9 +153,11 @@ fun VideoPlayerController(
     var doublePressDownJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     val openSeekController = {
-        if (!showSeekController) goTime = videoPlayerSeekState.position
-        showSeekController = true
-        showInfo = false
+        if (!videoPlayerConfigData.isLive) {
+            if (!showSeekController) goTime = videoPlayerSeekState.position
+            showSeekController = true
+            showInfo = false
+        }
     }
 
     val resetAutoSeekConfirmTimer = {
@@ -176,27 +188,34 @@ fun VideoPlayerController(
     }
 
     val onTimeForward = {
-        val baseTime = playerSeekForwardStep * 1000L // 转换为毫秒
-        val targetTime = goTime + (baseTime + calCoefficient() * 5000)
-        val duration = videoPlayerSeekState.duration
-        goTime = if (targetTime > duration) duration else targetTime
-        lastSeekChangeTime = System.currentTimeMillis()
-        moveState = SeekMoveState.Forward
-        resetAutoSeekConfirmTimer()
-        logger.info { "onTimeForward: [current=${videoPlayer.currentPosition}, goTime=$goTime]" }
+        if (!videoPlayerConfigData.isLive) {
+            val baseTime = playerSeekForwardStep * 1000L // 转换为毫秒
+            val targetTime = goTime + (baseTime + calCoefficient() * 5000)
+            val duration = videoPlayerSeekState.duration
+            goTime = if (targetTime > duration) duration else targetTime
+            lastSeekChangeTime = System.currentTimeMillis()
+            moveState = SeekMoveState.Forward
+            resetAutoSeekConfirmTimer()
+            logger.info { "onTimeForward: [current=${videoPlayer.currentPosition}, goTime=$goTime]" }
+        }
     }
     val onTimeBack = {
-        val baseTime = playerSeekBackwardStep * 1000L // 转换为毫秒
-        val targetTime = goTime - (baseTime + calCoefficient() * 5000)
-        goTime = if (targetTime < 0) 0 else targetTime
-        lastSeekChangeTime = System.currentTimeMillis()
-        moveState = SeekMoveState.Backward
-        resetAutoSeekConfirmTimer()
-        logger.info { "onTimeBack: [current=${videoPlayer.currentPosition}, goTime=$goTime]" }
+        if (!videoPlayerConfigData.isLive) {
+            val baseTime = playerSeekBackwardStep * 1000L // 转换为毫秒
+            val targetTime = goTime - (baseTime + calCoefficient() * 5000)
+            goTime = if (targetTime < 0) 0 else targetTime
+            lastSeekChangeTime = System.currentTimeMillis()
+            moveState = SeekMoveState.Backward
+            resetAutoSeekConfirmTimer()
+            logger.info { "onTimeBack: [current=${videoPlayer.currentPosition}, goTime=$goTime]" }
+        }
     }
 
     // 对外暴露 showInfo
     LaunchedEffect(Unit) { registerShowInfoProvider { showInfo } }
+    LaunchedEffect(showInfo, showSeekController, showListController) {
+        onViewerCountTipCanShowChanged(!showInfo && !showSeekController && !showListController)
+    }
 
     Box(
         modifier = modifier
@@ -293,6 +312,7 @@ fun VideoPlayerController(
 
                     Key.DirectionUp -> {
                         if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                        if (videoPlayerConfigData.isLive) return@onPreviewKeyEvent true
                         logger.info { "[${it.key} press]" }
                         scope.launch(Dispatchers.Main) {
                             showListController = true
@@ -303,6 +323,10 @@ fun VideoPlayerController(
                     Key.DirectionDown -> {
                         if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
                         logger.info { "[${it.key} press]" }
+                        if (videoPlayerConfigData.isLive) {
+                            showInfo = true
+                            return@onPreviewKeyEvent true
+                        }
 
                         // 检查是否为连按两次（间隔小于300ms且上次按键时间不为0）
                         val currentTime = System.currentTimeMillis()
@@ -469,11 +493,13 @@ fun VideoPlayerController(
                 showListController = true
             },
             onOpenRelatedVideo = {
-                onToggleRelatedVideos(true)
+                if (!videoPlayerConfigData.isLive) {
+                    onToggleRelatedVideos(true)
 
-                scope.launch(Dispatchers.Main) {
-                    delay(50)
-                    showInfo = false
+                    scope.launch(Dispatchers.Main) {
+                        delay(50)
+                        showInfo = false
+                    }
                 }
             },
             onOpenSetting = {
@@ -498,7 +524,11 @@ fun VideoPlayerController(
                 }
             },
             onSubtitleChange = onSubtitleChange,
-            onLoadNextVideo = onLoadNextVideo
+            onLoadNextVideo = onLoadNextVideo,
+            onShowComment = onShowComment,
+            onResolutionChange = onResolutionChange,
+            onLiveQualityChange = onLiveQualityChange,
+            viewerCountText = viewerCountText
         )
         SeekController(
             show = showSeekController,
@@ -517,11 +547,13 @@ fun VideoPlayerController(
             onRotationChange = onRotationChange,
             onPlaySpeedChange = onPlaySpeedChange,
             onAudioChange = onAudioChange,
+            onLiveQualityChange = onLiveQualityChange,
             onDanmakuSwitchChange = onDanmakuSwitchChange,
             onDanmakuSizeChange = onDanmakuSizeChange,
             onDanmakuOpacityChange = onDanmakuOpacityChange,
             onDanmakuAreaChange = onDanmakuAreaChange,
             onDanmakuMaskChange = onDanmakuMaskChange,
+            onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange,
             onSubtitleChange = onSubtitleChange,
             onSubtitleSizeChange = onSubtitleSizeChange,
             onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
@@ -531,24 +563,22 @@ fun VideoPlayerController(
         // 缓存底部进度条显示条件，避免频繁计算
         val shouldShowBottomProgressBar by remember { 
             derivedStateOf { 
-                showBottomProgressBar && !showInfo && !showSeekController 
+                showBottomProgressBar && !showInfo && !showSeekController  && !videoPlayerConfigData.isLive
             } 
         }
         
         // 底部常驻进度条组件
         if (shouldShowBottomProgressBar) {
             var throttledProgress by remember { mutableStateOf(0f) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    delay( 1000L)
-                    val currentPosition = videoPlayer.currentPosition
-                    val duration = videoPlayer.duration
-                    val currentProgress = if (duration > 0) {
-                        currentPosition.toFloat() / duration.toFloat()
+            LaunchedEffect(shouldShowBottomProgressBar) {
+                while (isActive) {
+                    val duration = videoPlayerSeekState.duration
+                    throttledProgress = if (duration > 0) {
+                        videoPlayerSeekState.position.toFloat() / duration.toFloat()
                     } else {
                         0f
                     }
-                    throttledProgress = currentProgress
+                    delay(1000)
                 }
             }
             
@@ -556,7 +586,7 @@ fun VideoPlayerController(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(2.2.dp),
+                    .height(2.3.dp),
                 progress = { throttledProgress },
                 color = SliderDefaults.colors().activeTrackColor,
                 trackColor = Color.Black.copy(alpha = 0.4f),

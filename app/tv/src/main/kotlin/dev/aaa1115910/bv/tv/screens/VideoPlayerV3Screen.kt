@@ -1,6 +1,7 @@
 package dev.aaa1115910.bv.tv.screens
 
 import android.app.Activity
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -69,9 +70,12 @@ import dev.aaa1115910.bv.player.entity.VideoPlayerSeekThumbData
 import dev.aaa1115910.bv.player.entity.VideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.VideoPlayerVideoShotData
 import dev.aaa1115910.bv.player.tv.BvPlayer
+import dev.aaa1115910.bv.player.tv.controller.LiveViewerCountTip
+import dev.aaa1115910.bv.player.tv.controller.OnlineViewerCountTip
 import dev.aaa1115910.bv.player.tv.controller.SkipTip
 import dev.aaa1115910.bv.tv.activities.video.UpInfoActivity
 import dev.aaa1115910.bv.tv.component.buttons.CoinButton
+import dev.aaa1115910.bv.tv.component.CommentPanel
 import dev.aaa1115910.bv.tv.component.buttons.FavoriteButton
 import dev.aaa1115910.bv.tv.component.buttons.LikeButton
 import dev.aaa1115910.bv.tv.manager.FollowStateManager
@@ -86,6 +90,7 @@ import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.util.formatHourMinSec
 import dev.aaa1115910.bv.util.swapList
 import dev.aaa1115910.bv.viewmodel.VideoPlayerV3ViewModel
+import dev.aaa1115910.biliapi.http.BiliHttpApi
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -123,6 +128,16 @@ fun VideoPlayerV3Screen(
     var autoActionTipVisible by remember { mutableStateOf(false) }
     var autoActionTipText by remember { mutableStateOf("") }
 
+    // 在线观看人数状态
+    var onlineViewerCount by remember { mutableStateOf("") }
+    var showOnlineViewerCountTip by remember { mutableStateOf(false) }
+    var canShowViewerCountTip by remember { mutableStateOf(true) }
+    var showLiveViewerCountTip by remember { mutableStateOf(false) }
+    var viewerCountText by remember { mutableStateOf("") }
+
+    // 评论面板状态
+    var showCommentPanel by remember { mutableStateOf(false) }
+
     // 焦点管理
     val relatedVideosFocusRequester = remember { FocusRequester() }
 
@@ -133,6 +148,85 @@ fun VideoPlayerV3Screen(
             kotlin.runCatching {
                 relatedVideosFocusRequester.requestFocus()
             }
+        }
+    }
+
+    // 获取在线观看人数
+    LaunchedEffect(playerViewModel.currentCid, playerViewModel.currentAid) {
+        if (playerViewModel.currentCid > 0 && playerViewModel.currentAid > 0 && Prefs.showOnlineViewerCount > 0) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val response = BiliHttpApi.getVideoOnlineTotal(
+                        cid = playerViewModel.currentCid,
+                        aid = playerViewModel.currentAid
+                    )
+                    if (response.code == 0) {
+                        onlineViewerCount = response.data?.total ?: ""
+                        showOnlineViewerCountTip = true
+
+                        // 如果设置为 30 秒后隐藏，则自动隐藏
+                        if (Prefs.showOnlineViewerCount == 1) {
+                            delay(30_000)
+                            showOnlineViewerCountTip = false
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.warn(e) { "Failed to get online viewer count" }
+                }
+            }
+        } else {
+            onlineViewerCount = ""
+        }
+    }
+
+    // 在线观看人数设置为30秒后隐藏或者始终显示，每 5 分钟刷新一次数据。虽然左下角隐藏，但播放器控制条中还要显示
+    LaunchedEffect(showOnlineViewerCountTip, Prefs.showOnlineViewerCount) {
+        if (showOnlineViewerCountTip) {
+            while (true) {
+                delay(300_000)  // 5 分钟
+                if (playerViewModel.currentCid > 0 && playerViewModel.currentAid > 0) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val response = BiliHttpApi.getVideoOnlineTotal(
+                                cid = playerViewModel.currentCid,
+                                aid = playerViewModel.currentAid
+                            )
+                            if (response.code == 0) {
+                                onlineViewerCount = response.data?.total ?: ""
+                            }
+                        } catch (e: Exception) {
+                            logger.warn(e) { "Failed to refresh online viewer count" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 控制直播人气显示
+    LaunchedEffect(playerViewModel.isLive, Prefs.showLiveViewerCountTip, playerViewModel.livePopularityText) {
+        if (playerViewModel.isLive && Prefs.showLiveViewerCountTip > 0 && playerViewModel.livePopularityText.isNotEmpty()) {
+            showLiveViewerCountTip = true
+            if (Prefs.showLiveViewerCountTip == 1) {
+                delay(30_000)
+                showLiveViewerCountTip = false
+            }
+        } else {
+            showLiveViewerCountTip = false
+        }
+    }
+
+    // 更新 viewerCountText
+    LaunchedEffect(Prefs.showOnlineViewerCount, onlineViewerCount, Prefs.showOnlineViewerCount, playerViewModel.livePopularityText, playerViewModel.liveOnlineCount) {
+        if (playerViewModel.isLive && Prefs.showOnlineViewerCount > 0) {
+            if (playerViewModel.livePopularityText.isNotEmpty()) {
+                viewerCountText = playerViewModel.livePopularityText
+            }
+            if (playerViewModel.liveOnlineCount.isNotEmpty()) {
+                viewerCountText = viewerCountText + "  ·  " + playerViewModel.liveOnlineCount
+            }
+        } else if (Prefs.showOnlineViewerCount > 0 && onlineViewerCount.isNotEmpty()) {
+            viewerCountText = "$onlineViewerCount 人正在看"
         }
     }
 
@@ -161,7 +255,8 @@ fun VideoPlayerV3Screen(
             pubTime = playerViewModel.pubTime,
             fromSeason = playerViewModel.fromSeason,
             isFollowingUp = playerViewModel.isFollowingUp,
-            isVerticalVideo = playerViewModel.isVerticalVideo
+            isVerticalVideo = playerViewModel.isVerticalVideo,
+            isLive = playerViewModel.isLive
         ),
         LocalVideoPlayerLogsData provides VideoPlayerLogsData(
             logs = playerViewModel.logs
@@ -196,6 +291,7 @@ fun VideoPlayerV3Screen(
             currentDanmakuOpacity = playerViewModel.currentDanmakuOpacity,
             currentDanmakuArea = playerViewModel.currentDanmakuArea,
             currentDanmakuMask = playerViewModel.currentDanmakuMask,
+            currentDanmakuRollingDurationFactor = playerViewModel.currentDanmakuRollingDurationFactor,
             currentSubtitleId = playerViewModel.currentSubtitleId,
             currentSubtitleData = playerViewModel.currentSubtitleData,
             currentSubtitleFontSize = playerViewModel.currentSubtitleFontSize,
@@ -206,7 +302,15 @@ fun VideoPlayerV3Screen(
             isLoop = playerViewModel.isLoop,
             showDanmaku = playerViewModel.showDanmaku,
             showRelatedVideos = playerViewModel.showRelatedVideos,
-            showNextVideoBtn = Prefs.playerLoadNextAction != PlayerLoadNextAction.DoNothing
+            showNextVideoBtn = Prefs.playerLoadNextAction != PlayerLoadNextAction.DoNothing,
+            defaultStartPosition = Prefs.playerDefaultStartPosition.toPlayerType(),
+            clipInfoList = playerViewModel.clipInfoList,
+            skipPgcIntroOutro = Prefs.skipPgcIntroOutro,
+            isLive = playerViewModel.isLive,
+            availableLiveQualities = playerViewModel.availableLiveQualities.toList(),
+            currentLiveQn = playerViewModel.currentLiveQn,
+            currentLiveQualityDescription = playerViewModel.currentLiveQualityDescription,
+            controllerButtonsOrder = Prefs.playerControllerButtonsOrder
         ),
         LocalVideoPlayerDanmakuMasksData provides VideoPlayerDanmakuMasksData(
             danmakuMasks = playerViewModel.danmakuMasks,
@@ -238,6 +342,12 @@ fun VideoPlayerV3Screen(
                 playerSeekBackwardStep = Prefs.playerSeekBackwardStep,
                 showBottomProgressBar = Prefs.playerShowBottomProgressBar,
                 useTextureViewFixPortraitVideo = Prefs.portraitVideoFixMode == PortraitVideoFixMode.UseTextureView && playerViewModel.isVerticalVideo && playerViewModel.currentQuality >= Resolution.R4K,
+                onViewerCountTipCanShowChanged = { canShow ->
+                    if (canShowViewerCountTip != canShow) {
+                        canShowViewerCountTip = canShow
+                    }
+                },
+                viewerCountText = viewerCountText,
                 onToggleRelatedVideos = { state ->
                     playerViewModel.showRelatedVideos = if (playerViewModel.relatedVideos.isNotEmpty()) state else false
                 },
@@ -300,7 +410,7 @@ fun VideoPlayerV3Screen(
                                 if (!immediate) {
                                     autoActionTipText = "播放结束，即将播放下一集"
                                     autoActionTipVisible = true
-                                    delay(1600)
+                                    delay(1300)
                                 }
                                 autoActionTipVisible = false
                                 if (autoActionCountdownJob != null) {
@@ -358,7 +468,7 @@ fun VideoPlayerV3Screen(
                             try {
                                 autoActionTipText = "播放结束，即将退出"
                                 autoActionTipVisible = true
-                                delay(1600)
+                                delay(1300)
                                 autoActionTipVisible = false
                                 if (autoActionCountdownJob != null) {
                                     autoActionCountdownJob = null
@@ -408,17 +518,34 @@ fun VideoPlayerV3Screen(
                     }
                 },
                 onRefreshVideo = {
-                    val time = playerViewModel.videoPlayer?.currentPosition ?: 0
-                    logger.info { "Reload video and back to time: ${time.formatHourMinSec()}" }
-                    scope.launch {
-                        playerViewModel.playQuality()
-                        delay(300)
-                        playerViewModel.videoPlayer?.seekTo(time)
-                        playerViewModel.danmakuPlayer?.seekTo(time)
-                        playerViewModel.danmakuPlayer?.pause()
-                        playerViewModel.videoPlayer?.start()
+                    if (playerViewModel.isLive) {
+                        // 直播模式：重新获取直播流 URL
+                        logger.info { "Reload live stream for room ${playerViewModel.liveRoomId}" }
+                        playerViewModel.loadLiveStreamWithQuality(
+                            playerViewModel.liveRoomId,
+                            playerViewModel.currentLiveQn
+                        )
+                    } else {
+                        val time = playerViewModel.videoPlayer?.currentPosition ?: 0
+                        logger.info { "Reload video and back to time: ${time.formatHourMinSec()}" }
+                        scope.launch {
+                            val toast = Toast.makeText(context, "刷新中...", Toast.LENGTH_SHORT)
+                            toast.show()
+                            playerViewModel.playQuality()
+                            delay(300)
+                            playerViewModel.videoPlayer?.seekTo(time)
+                            playerViewModel.danmakuPlayer?.seekTo(time)
+                            playerViewModel.danmakuPlayer?.pause()
+                            playerViewModel.videoPlayer?.start()
+                            delay(300)
+                            toast.cancel()
+                        }
                     }
                 },
+                onLiveRetry = {
+                    playerViewModel.retryLiveStream()
+                },
+                onShowComment = { showCommentPanel = true },
                 onResolutionChange = { resolutionCode, afterChange ->
                     scope.launch(Dispatchers.Default) {
                         playerViewModel.playQuality(resolutionCode)
@@ -453,6 +580,9 @@ fun VideoPlayerV3Screen(
                         afterChange()
                     }
                 },
+                onLiveQualityChange = { qn ->
+                    playerViewModel.changeLiveQuality(qn)
+                },
                 onDanmakuSwitchChange = { enabledDanmakuTypes ->
                     Prefs.defaultDanmakuTypes = enabledDanmakuTypes
                     playerViewModel.currentDanmakuTypes.swapList(enabledDanmakuTypes)
@@ -472,6 +602,10 @@ fun VideoPlayerV3Screen(
                 onDanmakuMaskChange = { mask ->
                     Prefs.defaultDanmakuMask = mask
                     playerViewModel.currentDanmakuMask = mask
+                },
+                onDanmakuRollingDurationFactorChange = { factor ->
+                    Prefs.defaultDanmakuRollingDurationFactor = factor
+                    playerViewModel.currentDanmakuRollingDurationFactor = factor
                 },
                 onSubtitleChange = { subtitle ->
                     playerViewModel.loadSubtitle(subtitle.id)
@@ -606,7 +740,7 @@ fun VideoPlayerV3Screen(
                                     scope.launch {
                                         val success = VideoUserActionManager.addToDefaultFavoriteFolder(playerViewModel.currentAid, Prefs.uid)
                                         if (!success) {
-                                            "收藏操作失败".toast(context)
+                                            "收藏失败！默认收藏夹不存在？".toast(context)
                                         }
                                     }
                                 },
@@ -614,7 +748,7 @@ fun VideoPlayerV3Screen(
                                     scope.launch {
                                         val success = VideoUserActionManager.updateVideoFavoriteFolders(playerViewModel.currentAid, it, Prefs.uid)
                                         if (!success) {
-                                            "收藏操作失败".toast(context)
+                                            "收藏失败！此收藏夹收藏数量已达上限（1000）".toast(context)
                                         }
                                     }
                                 },
@@ -675,7 +809,7 @@ fun VideoPlayerV3Screen(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth(),
-                visible = playerViewModel.showRelatedVideos,
+                visible = playerViewModel.showRelatedVideos && !playerViewModel.isLive,
                 enter = expandVertically(),
                 exit = shrinkVertically(),
                 label = "RelatedVideosForPlayer"
@@ -701,6 +835,28 @@ fun VideoPlayerV3Screen(
                     }
                 )
             }
+
+            // 在线观看人数 Tip
+            OnlineViewerCountTip(
+                show = showOnlineViewerCountTip && canShowViewerCountTip && !playerViewModel.showRelatedVideos,
+                count = onlineViewerCount
+            )
+
+            // 评论面板
+            if (playerViewModel.currentAid > 0) {
+                CommentPanel(
+                    show = showCommentPanel,
+                    oid = playerViewModel.currentAid,
+                    onHide = { showCommentPanel = false }
+                )
+            }
+
+            // 直播人气 Tip（左下角常驻）
+            LiveViewerCountTip(
+                show = showLiveViewerCountTip && canShowViewerCountTip && playerViewModel.livePopularityText.isNotEmpty(),
+                popularityText = playerViewModel.livePopularityText,
+                onlineCount = playerViewModel.liveOnlineCount
+            )
         }
     }
 }

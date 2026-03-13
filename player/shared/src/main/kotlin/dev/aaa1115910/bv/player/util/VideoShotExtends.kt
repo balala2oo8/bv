@@ -57,8 +57,19 @@ private fun findClosestValueIndex(array: List<UShort>, target: UShort): Int {
 }
 
 private object VideoShotImageCache {
-    var hash: Int = 0
-    var image: Bitmap? = null
+    private data class CacheEntry(
+        val hash: Int,
+        val image: Bitmap
+    )
+
+    private const val MAX_CACHE_SIZE = 2
+
+    // 使用 LRU 缓存最多两张大图
+    private val cache = object : LinkedHashMap<Int, CacheEntry>(MAX_CACHE_SIZE, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, CacheEntry>?): Boolean {
+            return size > MAX_CACHE_SIZE
+        }
+    }
 
     // 保存正在解码的任务，避免重复解码
     private val decodingTasks = mutableMapOf<Int, Deferred<Bitmap>>()
@@ -95,8 +106,10 @@ private object VideoShotImageCache {
         val imageHash = imageData.hashCode()
 
         // 如果已经缓存了这张图片，直接返回
-        if (imageHash == hash && image != null) {
-            return@coroutineScope image!!
+        cache[imagesIndex]?.let { entry ->
+            if (entry.hash == imageHash) {
+                return@coroutineScope entry.image
+            }
         }
 
         // 如果正在解码这张图片，等待解码完成
@@ -112,8 +125,7 @@ private object VideoShotImageCache {
 
         try {
             val result = decodingTask.await()
-            hash = imageHash
-            image = result
+            cache[imagesIndex] = CacheEntry(imageHash, result)
             return@coroutineScope result
         } finally {
             // 解码完成后移除任务

@@ -96,6 +96,7 @@ import dev.aaa1115910.bv.entity.proxy.ProxyArea
 import dev.aaa1115910.bv.player.entity.VideoListPgcEpisode
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.tv.activities.video.VideoInfoActivity
+import dev.aaa1115910.bv.tv.component.CommentPanel
 import dev.aaa1115910.bv.tv.component.LoadingTip
 import dev.aaa1115910.bv.tv.component.TvAlertDialog
 import dev.aaa1115910.bv.tv.component.buttons.SeasonInfoButtons
@@ -161,7 +162,9 @@ fun SeasonInfoScreen(
 
     var paused by remember { mutableStateOf(false) }
     var showSeasonSelector by remember { mutableStateOf(false) }
+    var showCommentPanel by remember { mutableStateOf(false) }
     val defaultFocusRequester = remember { FocusRequester() }
+    val commentButtonFocusRequester = remember { FocusRequester() }
 
     val onClickVideo: (avid: Long, cid: Long, epid: Int, episodeTitle: String, startTime: Int) -> Unit =
         { avid, cid, epid, episodeTitle, startTime ->
@@ -200,6 +203,24 @@ fun SeasonInfoScreen(
 
     val onClickCover = {
         if (seasonViewModel.seasonData?.seasons?.isNotEmpty() == true) showSeasonSelector = true
+    }
+
+    val onShowComment = {
+        showCommentPanel = true
+    }
+
+    val getCommentAid = {
+        val lastEpId = seasonViewModel.lastPlayProgress?.lastEpId
+        if (lastEpId != null) {
+            // 查找最后播放的剧集
+            seasonViewModel.seasonData?.episodes?.find { it.id == lastEpId }?.aid
+                ?: seasonViewModel.seasonData?.sections?.mapNotNull { section ->
+                    section.episodes.find { it.id == lastEpId }?.aid
+                }?.firstOrNull()
+        } else {
+            // 没有播放记录，使用第一集
+            seasonViewModel.seasonData?.episodes?.firstOrNull()?.aid
+        } ?: 0L
     }
 
     LaunchedEffect(Unit) {
@@ -375,7 +396,9 @@ fun SeasonInfoScreen(
                             }
                         },
                         onClickFollow = onClickFollow,
-                        onClickCover = onClickCover
+                        onClickCover = onClickCover,
+                        onShowComment = onShowComment,
+                        commentButtonFocusRequester = commentButtonFocusRequester
                     )
                 }
                 if (seasonViewModel.seasonData?.episodes?.isNotEmpty() == true) {
@@ -462,6 +485,21 @@ fun SeasonInfoScreen(
             }
         }
     )
+
+    CommentPanel(
+        show = showCommentPanel,
+        oid = getCommentAid(),
+        onHide = {
+            showCommentPanel = false
+            commentButtonFocusRequester.requestFocus(scope)
+        },
+        episodes = seasonViewModel.seasonData?.episodes ?: emptyList(),
+        sections = seasonViewModel.seasonData?.sections ?: emptyList(),
+        initialEpisodeId = seasonViewModel.lastPlayProgress?.lastEpId ?: -1,
+        onEpisodeChange = { episode ->
+            logger.debug { "User viewed comments for episode: ${episode.id} (${episode.title})" }
+        }
+    )
 }
 
 @Composable
@@ -538,6 +576,8 @@ fun SeasonBaseInfo(
     publishDate: String,
     onPlay: () -> Unit,
     onClickFollow: (follow: Boolean) -> Unit,
+    onShowComment: () -> Unit = {},
+    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() }
 ) {
     Column(
         modifier = modifier
@@ -565,7 +605,9 @@ fun SeasonBaseInfo(
             isPublished = isPublished,
             publishDate = publishDate,
             onPlay = onPlay,
-            onClickFollow = onClickFollow
+            onClickFollow = onClickFollow,
+            onShowComment= onShowComment,
+            commentButtonFocusRequester = commentButtonFocusRequester
         )
     }
 }
@@ -585,7 +627,9 @@ fun SeasonInfoPart(
     seasonCount: Int,
     onPlay: () -> Unit,
     onClickFollow: (follow: Boolean) -> Unit,
-    onClickCover: () -> Unit
+    onClickCover: () -> Unit,
+    onShowComment: () -> Unit = {},
+    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() }
 ) {
     Row(
         modifier = modifier
@@ -608,7 +652,9 @@ fun SeasonInfoPart(
             isPublished = isPublished,
             publishDate = publishDate,
             onPlay = onPlay,
-            onClickFollow = onClickFollow
+            onClickFollow = onClickFollow,
+            onShowComment = onShowComment,
+            commentButtonFocusRequester = commentButtonFocusRequester
         )
     }
 }
@@ -622,9 +668,11 @@ fun SeasonEpisodeButton(
     cover: String,
     duration: Int,
     played: Int = 0,
+    isLastPlayed: Boolean = false,
     onClick: () -> Unit
 ) {
     val isPreview = LocalInspectionMode.current
+    val borderColor = if (isLastPlayed) Color(0xFFE39B17) else null
 
     Surface(
         modifier = modifier,
@@ -633,7 +681,28 @@ fun SeasonEpisodeButton(
             focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
             pressedContainerColor = MaterialTheme.colorScheme.inverseSurface
         ),
+        scale = ClickableSurfaceDefaults.scale(scale = 1f, focusedScale = 1f),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
+        border = ClickableSurfaceDefaults.border(
+            border = borderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None,
+            focusedBorder = borderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None,
+            pressedBorder = borderColor?.let {
+                Border(
+                    border = BorderStroke(2.dp, it),
+                    shape = MaterialTheme.shapes.medium
+                )
+            } ?: Border.None
+        ),
         onClick = onClick
     ) {
         Row {
@@ -811,6 +880,7 @@ fun SeasonEpisodesDialog(
                                 title = episodeTitle,
                                 cover = episode.cover,
                                 played = if (episode.id == lastPlayedId) lastPlayedTime else 0,
+                                isLastPlayed = episode.id == lastPlayedId,
                                 duration = episode.duration,
                                 onClick = {
                                     onClick(
@@ -840,6 +910,7 @@ fun SeasonEpisodeRow(
     onClick: (avid: Long, cid: Long, epid: Int, episodeTitle: String, startTime: Int) -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    val rowState = rememberLazyListState()
     var hasFocus by remember { mutableStateOf(false) }
     val titleColor = if (hasFocus) Color.White else Color.White.copy(alpha = 0.6f)
     val titleFontSize by animateFloatAsState(
@@ -848,6 +919,16 @@ fun SeasonEpisodeRow(
     )
 
     var showEpisodesDialog by remember { mutableStateOf(false) }
+
+    // 当存在历史记录时，滚动到对应集
+    LaunchedEffect(lastPlayedId, episodes) {
+        if (lastPlayedId != 0 && episodes.isNotEmpty()) {
+            val lastPlayedIndex = episodes.indexOfFirst { it.id == lastPlayedId }
+            if (lastPlayedIndex != -1) {
+                rowState.scrollToItem(lastPlayedIndex)
+            }
+        }
+    }
 
     Column(
         modifier = modifier
@@ -865,6 +946,7 @@ fun SeasonEpisodeRow(
             modifier = Modifier
                 .padding(top = 15.dp)
                 .focusRestorer(focusRequester),
+            state = rowState,
             contentPadding = PaddingValues(horizontal = 32.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
@@ -910,6 +992,7 @@ fun SeasonEpisodeRow(
                     title = episodeTitle,
                     cover = episode.cover,
                     played = if (episode.id == lastPlayedId) lastPlayedTime else 0,
+                    isLastPlayed = episode.id == lastPlayedId,
                     duration = episode.duration,
                     onClick = {
                         val pTitle = generateEpisodeTitle(episode, title)
@@ -930,6 +1013,8 @@ fun SeasonEpisodeRow(
         show = showEpisodesDialog,
         title = title,
         episodes = episodes,
+        lastPlayedId = lastPlayedId,
+        lastPlayedTime = lastPlayedTime,
         onHideDialog = { showEpisodesDialog = false },
         onClick = onClick
     )
