@@ -16,7 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -196,7 +196,10 @@ fun LogsScreenContent(
                             onClick = onClickCreateLog
                         )
                     }
-                    items(items = logs) { logFile ->
+                    itemsIndexed(
+                        items = logs,
+                        key = { index, logFile -> "$index-${logFile.absolutePath}" }
+                    ) { _, logFile ->
                         LogItem(
                             filename = logFile.name,
                             size = logFile.length(),

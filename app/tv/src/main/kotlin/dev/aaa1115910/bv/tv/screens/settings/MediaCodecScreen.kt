@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.Videocam
@@ -158,7 +158,10 @@ fun MediaCodecListItems(
         contentPadding = PaddingValues(24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(items = codecInfoDataList) { codecInfoData ->
+        itemsIndexed(
+            items = codecInfoDataList,
+            key = { index, codecInfoData -> "$index-$codecInfoData" }
+        ) { _, codecInfoData ->
             val buttonModifier = if (currentCodecInfoData == codecInfoData) Modifier
                 .focusRequester(focusRequester)
                 .fillMaxWidth()

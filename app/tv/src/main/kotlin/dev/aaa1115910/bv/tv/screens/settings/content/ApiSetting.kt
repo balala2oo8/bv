@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,7 +50,10 @@ fun ApiSetting(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(items = ApiType.entries) { apiType ->
+                itemsIndexed(
+                    items = ApiType.entries,
+                    key = { index, apiType -> "$index-api-${apiType.name}" }
+                ) { _, apiType ->
                     SettingsMenuSelectItem(
                         text = apiType.name,
                         selected = selectedApiType == apiType,

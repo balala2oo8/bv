@@ -266,7 +266,10 @@ private fun SearchHotwords(
             modifier = Modifier,
             contentPadding = PaddingValues(vertical = 4.dp)
         ) {
-            itemsIndexed(hotwords) { index, hotword ->
+            itemsIndexed(
+                items = hotwords,
+                key = { index, hotword -> "$index-hotword-${hotword.showName}" }
+            ) { _, hotword ->
                 SearchKeyword(
                     modifier = Modifier,
                     keyword = hotword.showName,
@@ -300,7 +303,10 @@ private fun SearchSuggestion(
             modifier = Modifier,
             contentPadding = PaddingValues(vertical = 4.dp)
         ) {
-            itemsIndexed(suggests) { index, suggest ->
+            itemsIndexed(
+                items = suggests,
+                key = { index, suggest -> "$index-suggest-$suggest" }
+            ) { _, suggest ->
                 SearchKeyword(
                     modifier = Modifier,
                     keyword = suggest,
@@ -371,7 +377,10 @@ private fun SearchHistory(
             modifier = Modifier,
             contentPadding = PaddingValues(vertical = 4.dp)
         ) {
-            itemsIndexed(histories) { index, searchHistory ->
+            itemsIndexed(
+                items = histories,
+                key = { index, searchHistory -> "$index-history-${searchHistory.id ?: searchHistory.keyword}" }
+            ) { index, searchHistory ->
                 SearchKeyword(
                     modifier = Modifier,
                     keyword = searchHistory.keyword,

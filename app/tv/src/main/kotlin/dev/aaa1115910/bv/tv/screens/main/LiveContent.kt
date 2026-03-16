@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,12 +34,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.aaa1115910.biliapi.entity.live.LiveAreaItem
 import dev.aaa1115910.bv.tv.activities.video.VideoPlayerV3Activity
 import dev.aaa1115910.bv.tv.component.LoadingTip
 import dev.aaa1115910.bv.tv.component.TopNav
 import dev.aaa1115910.bv.tv.component.TopNavItem
 import dev.aaa1115910.bv.tv.component.live.LiveRoomCard
+import dev.aaa1115910.bv.tv.util.blockDownFocusExitAtGridEnd
 import dev.aaa1115910.bv.util.requestFocus
 import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.viewmodel.live.LiveMode
@@ -46,6 +51,7 @@ import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import dev.aaa1115910.biliapi.entity.live.LiveAreaGroup
 import dev.aaa1115910.bv.tv.util.ProvideListBringIntoViewSpec
+import dev.aaa1115910.bv.tv.util.rememberTvLazyListFocusRestorer
 
 // 固定 TopNavItem：推荐
 private object RecommendNavItem : TopNavItem {
@@ -81,6 +87,7 @@ fun LiveContent(
     // 使用 MainScreen 传入的 FocusRequester 作为默认入口焦点（从侧边栏按右进入内容区）
     val parentNavFocusRequester = navFocusRequester
     val subNavFocusRequester = remember { FocusRequester() }
+    val roomListFocusRestorer = rememberTvLazyListFocusRestorer()
     var focusOnContent by remember { mutableStateOf(false) }
     var parentNavHasFocus by remember { mutableStateOf(false) }
     var subNavHasFocus by remember { mutableStateOf(false) }
@@ -95,7 +102,7 @@ fun LiveContent(
     val focusedIndex = liveViewModel.lastFocusedRoomIndex
     val totalItems = liveViewModel.roomList.size
     LaunchedEffect(focusedIndex, totalItems, liveViewModel.loading) {
-        if ((totalItems < 20 || focusedIndex >= totalItems - 12) && liveViewModel.hasMore && !liveViewModel.loading) {
+        if ((totalItems < 10 || focusedIndex >= totalItems - 8) && liveViewModel.hasMore && !liveViewModel.loading) {
             logger.info { "Trigger load more, focusedIndex: $focusedIndex, totalItems: $totalItems" }
             liveViewModel.loadMore()
         }
@@ -243,7 +250,15 @@ fun LiveContent(
             } else {
                 ProvideListBringIntoViewSpec(topPadding = 12.dp, bottomPadding = 28.dp) {
                     LazyVerticalGrid(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = roomListFocusRestorer.containerModifier(
+                            Modifier
+                                .fillMaxSize()
+                                .blockDownFocusExitAtGridEnd(
+                                    currentIndex = focusedIndex,
+                                    itemCount = totalItems,
+                                    columnCount = 4
+                                )
+                        ),
                         state = gridState,
                         columns = GridCells.Fixed(4),
                         contentPadding = PaddingValues(20.dp, 0.dp, 20.dp, 20.dp),
@@ -252,14 +267,9 @@ fun LiveContent(
                     ) {
                         itemsIndexed(
                             items = liveViewModel.roomList,
-                            key = { _, room -> room.roomId }
+                            key = { index, room -> "$index-room-${room.roomId}" }
                         ) { index, room ->
-                            val entryCardModifier =
-                                if (index == 0 && liveViewModel.parentAreaGroups.isEmpty()) {
-                                    Modifier.focusRequester(navFocusRequester)
-                                } else {
-                                    Modifier
-                                }
+                            val entryCardModifier = roomListFocusRestorer.firstItemModifier(index)
 
                             LiveRoomCard(
                                 modifier = entryCardModifier,
@@ -300,12 +310,14 @@ fun LiveContent(
                         if (!liveViewModel.hasMore) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(20.dp),
+                                    modifier = Modifier.offset(y = (-16).dp),
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Text(text = "没有更多内容了")
+                                    Text(
+                                        text = "没有更多内容了~",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
                                 }
                             }
                         }

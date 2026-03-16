@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.runtime.Composable
@@ -98,7 +98,10 @@ fun SearchResultVideoFilter(
                         },
                         horizontalArrangement = Arrangement.spacedBy(filterRowSpace)
                     ) {
-                        items(items = SearchFilterOrderType.webFilters) { orderType ->
+                        itemsIndexed(
+                            items = SearchFilterOrderType.webFilters,
+                            key = { index, orderType -> "$index-order-${orderType.name}" }
+                        ) { _, orderType ->
                             FilterDialogFilterChip(
                                 focusRequester = defaultFocusRequester,
                                 selected = orderType == selectedOrder,
@@ -128,7 +131,10 @@ fun SearchResultVideoFilter(
                         },
                         horizontalArrangement = Arrangement.spacedBy(filterRowSpace)
                     ) {
-                        items(items = SearchFilterDuration.entries) { duration ->
+                        itemsIndexed(
+                            items = SearchFilterDuration.entries,
+                            key = { index, duration -> "$index-duration-${duration.name}" }
+                        ) { _, duration ->
                             FilterDialogFilterChip(
                                 focusRequester = durationFocusRequester,
                                 selected = duration == selectedDuration,
@@ -171,7 +177,10 @@ fun SearchResultVideoFilter(
                                 enabled = !isDialogJustOpened
                             )
                         }
-                        items(items = partitions) { partition ->
+                        itemsIndexed(
+                            items = partitions,
+                            key = { index, partition -> "$index-partition-${partition.tid}" }
+                        ) { _, partition ->
                             FilterDialogFilterChip(
                                 focusRequester = partitionFocusRequester,
                                 selected = partition == selectedPartition,
@@ -198,7 +207,10 @@ fun SearchResultVideoFilter(
                             },
                             horizontalArrangement = Arrangement.spacedBy(filterRowSpace)
                         ) {
-                            items(items = selectedPartition?.children ?: emptyList()) { partition ->
+                            itemsIndexed(
+                                items = selectedPartition?.children ?: emptyList(),
+                                key = { index, partition -> "$index-child-${partition.tid}" }
+                            ) { _, partition ->
                                 FilterDialogFilterChip(
                                     focusRequester = partitionChildFocusRequester,
                                     selected = partition == selectedChildPartition,

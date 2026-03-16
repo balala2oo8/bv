@@ -860,7 +860,7 @@ fun SeasonEpisodesDialog(
                     ) {
                         itemsIndexed(
                             items = selectedEpisodes,
-                            key = { _, episode -> episode.aid + episode.cid }
+                            key = { index, episode -> "$index-episode-${episode.aid}-${episode.cid}" }
                         ) { index, episode ->
                             val episodeTitle by remember { mutableStateOf(generateEpisodeTitle(episode, title)) }
                             val buttonModifier =
@@ -975,7 +975,10 @@ fun SeasonEpisodeRow(
                     }
                 }
             }
-            itemsIndexed(items = episodes) { index, episode ->
+            itemsIndexed(
+                items = episodes,
+                key = { index, episode -> "$index-episode-${episode.id}" }
+            ) { index, episode ->
                 val episodeTitle by remember { mutableStateOf(if (episode.longTitle != "") episode.longTitle else episode.title) }
                 SeasonEpisodeButton(
                     modifier = Modifier
@@ -1166,7 +1169,10 @@ private fun SeasonSelectorContent(
                     contentPadding = PaddingValues(horizontal = 48.dp),
                     horizontalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    itemsIndexed(items = seasons) { index, season ->
+                    itemsIndexed(
+                        items = seasons,
+                        key = { index, season -> "$index-season-${season.seasonId}" }
+                    ) { index, season ->
                         Card(
                             modifier = Modifier
                                 .onFocusChanged {

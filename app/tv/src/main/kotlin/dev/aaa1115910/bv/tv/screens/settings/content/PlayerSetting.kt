@@ -589,7 +589,10 @@ private fun PlayerControllerButtonDialog(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    itemsIndexed(buttonConfigs) { index, config ->
+                    itemsIndexed(
+                        items = buttonConfigs,
+                        key = { index, config -> "$index-button-${config.id}" }
+                    ) { index, config ->
                         ControllerButtonEditRow(
                             title = getControllerButtonDisplayName(config.id),
                             hidden = config.hidden,
