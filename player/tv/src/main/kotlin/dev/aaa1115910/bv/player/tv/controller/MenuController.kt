@@ -44,6 +44,7 @@ import dev.aaa1115910.biliapi.entity.video.SubtitleAiType
 import dev.aaa1115910.biliapi.entity.video.SubtitleType
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.entity.LiveCodec
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
@@ -71,17 +72,20 @@ fun MenuController(
     onPlaySpeedChange: (Float) -> Unit = {},
     onAudioChange: (Audio) -> Unit,
     onLiveQualityChange: (Int) -> Unit = {},
+    onLiveCodecChange: (LiveCodec) -> Unit = {},
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit = {},
     onDanmakuRollingDurationFactorChange: (Float) -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit
+    onPlayModeChange: (PlayMode) -> Unit,
+    onDebugInfoChange: (Boolean) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val defaultFocusRequester = remember { FocusRequester() }
@@ -108,17 +112,20 @@ fun MenuController(
                 onPlaySpeedChange = onPlaySpeedChange,
                 onAudioChange = onAudioChange,
                 onLiveQualityChange = onLiveQualityChange,
+                onLiveCodecChange = onLiveCodecChange,
                 onDanmakuSwitchChange = onDanmakuSwitchChange,
                 onDanmakuSizeChange = onDanmakuSizeChange,
                 onDanmakuOpacityChange = onDanmakuOpacityChange,
                 onDanmakuAreaChange = onDanmakuAreaChange,
                 onDanmakuMaskChange = onDanmakuMaskChange,
                 onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange,
+                onDanmakuFilterLevelChange = onDanmakuFilterLevelChange,
                 onSubtitleChange = onSubtitleChange,
                 onSubtitleSizeChange = onSubtitleSizeChange,
                 onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
                 onSubtitleBottomPadding = onSubtitleBottomPadding,
-                onPlayModeChange = onPlayModeChange
+                onPlayModeChange = onPlayModeChange,
+                onDebugInfoChange = onDebugInfoChange
             )
         }
     }
@@ -135,17 +142,20 @@ fun MenuController(
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onLiveQualityChange: (Int) -> Unit = {},
+    onLiveCodecChange: (LiveCodec) -> Unit = {},
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit = {},
     onDanmakuRollingDurationFactorChange: (Float) -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit
+    onPlayModeChange: (PlayMode) -> Unit,
+    onDebugInfoChange: (Boolean) -> Unit = {}
 ) {
     var selectedNavItem by remember { mutableStateOf(VideoPlayerMenuNavItem.Picture) }
     var focusState by remember { mutableStateOf(MenuFocusState.MenuNav) }
@@ -175,18 +185,21 @@ fun MenuController(
                     onRotationChange = onRotationChange,
                     onAudioChange = onAudioChange,
                     onLiveQualityChange = onLiveQualityChange,
+                    onLiveCodecChange = onLiveCodecChange,
                     onDanmakuSwitchChange = onDanmakuSwitchChange,
                     onDanmakuSizeChange = onDanmakuSizeChange,
                     onDanmakuOpacityChange = onDanmakuOpacityChange,
                     onDanmakuAreaChange = onDanmakuAreaChange,
                     onDanmakuMaskChange = onDanmakuMaskChange,
                     onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange,
+                    onDanmakuFilterLevelChange = onDanmakuFilterLevelChange,
                     onFocusStateChange = { focusState = it },
                     onSubtitleChange = onSubtitleChange,
                     onSubtitleSizeChange = onSubtitleSizeChange,
                     onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
                     onSubtitleBottomPadding = onSubtitleBottomPadding,
-                    onPlayModeChange = onPlayModeChange
+                    onPlayModeChange = onPlayModeChange,
+                    onDebugInfoChange = onDebugInfoChange
                 )
                 MenuNavList(
                     modifier = Modifier
@@ -221,17 +234,20 @@ private fun MenuList(
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onLiveQualityChange: (Int) -> Unit = {},
+    onLiveCodecChange: (LiveCodec) -> Unit = {},
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit = {},
     onDanmakuRollingDurationFactorChange: (Float) -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
     onPlayModeChange: (PlayMode) -> Unit,
+    onDebugInfoChange: (Boolean) -> Unit = {},
     onFocusStateChange: (MenuFocusState) -> Unit
 ) {
     Box(
@@ -248,6 +264,7 @@ private fun MenuList(
                     onPlaySpeedChange = onPlaySpeedChange,
                     onAudioChange = onAudioChange,
                     onLiveQualityChange = onLiveQualityChange,
+                    onLiveCodecChange = onLiveCodecChange,
                     onFocusStateChange = onFocusStateChange
                 )
             }
@@ -260,7 +277,8 @@ private fun MenuList(
                     onDanmakuAreaChange = onDanmakuAreaChange,
                     onFocusStateChange = onFocusStateChange,
                     onDanmakuMaskChange = onDanmakuMaskChange,
-                    onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange
+                    onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange,
+                    onDanmakuFilterLevelChange = onDanmakuFilterLevelChange
                 )
             }
 
@@ -274,12 +292,13 @@ private fun MenuList(
                 )
             }
 
-//            VideoPlayerMenuNavItem.Others -> {
-//                OthersMenuList(
-//                    onPlayModeChange = onPlayModeChange,
-//                    onFocusStateChange = onFocusStateChange
-//                )
-//            }
+            VideoPlayerMenuNavItem.Others -> {
+                OthersMenuList(
+                    onPlayModeChange = onPlayModeChange,
+                    onDebugInfoChange = onDebugInfoChange,
+                    onFocusStateChange = onFocusStateChange
+                )
+            }
         }
     }
 }
@@ -310,7 +329,7 @@ fun MenuControllerPreview() {
     var currentSubtitleBackgroundOpacity by remember { mutableFloatStateOf(0.4f) }
     var currentSubtitleBottomPadding by remember { mutableStateOf(8.dp) }
 
-    var currentPlayMode by remember { mutableStateOf(PlayMode.Sequential) }
+    var currentPlayMode by remember { mutableStateOf(PlayMode.PartAndEpisode) }
 
     LaunchedEffect(Unit) {
         currentSubtitleList.apply {

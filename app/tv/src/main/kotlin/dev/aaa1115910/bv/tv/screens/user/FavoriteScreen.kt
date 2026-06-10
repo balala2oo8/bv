@@ -1,14 +1,18 @@
 package dev.aaa1115910.bv.tv.screens.user
 
+import android.content.Context
+import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -19,6 +23,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -32,31 +37,44 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Tab
-import androidx.tv.material3.TabRow
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.aaa1115910.biliapi.entity.FavoriteFolderMetadata
 import dev.aaa1115910.bv.R
+import dev.aaa1115910.bv.entity.NavSwitchMode
+import dev.aaa1115910.bv.entity.carddata.VideoCardData
+import dev.aaa1115910.bv.entity.proxy.ProxyArea
+import dev.aaa1115910.bv.repository.VideoInfoRepository
+import dev.aaa1115910.bv.tv.activities.video.SeasonInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.UpInfoActivity
+import dev.aaa1115910.bv.tv.component.TvAlertDialog
 import dev.aaa1115910.bv.tv.component.videocard.SmallVideoCard
 import dev.aaa1115910.bv.tv.activities.video.VideoInfoActivity
+import dev.aaa1115910.bv.tv.manager.VideoUserActionManager
+import dev.aaa1115910.bv.tv.component.TopNav
+import dev.aaa1115910.bv.tv.component.TopNavItem
 import dev.aaa1115910.bv.tv.util.blockDownFocusExitAtGridEnd
 import dev.aaa1115910.bv.tv.util.ProvideListBringIntoViewSpec
 import dev.aaa1115910.bv.tv.util.rememberTvLazyListFocusRestorer
 import dev.aaa1115910.bv.tv.util.stableItemKey
-import dev.aaa1115910.bv.util.ifElse
+import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.onDelayFocusChanged
+import dev.aaa1115910.bv.util.requestFocus
+import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.viewmodel.user.FavoriteViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.getKoin
 
 @Composable
 fun FavoriteScreen(
@@ -66,6 +84,8 @@ fun FavoriteScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val videoInfoRepository: VideoInfoRepository = getKoin().get()
+    val navSwitchMode by Prefs.navSwitchModeFlow.collectAsState(Prefs.navSwitchMode)
     var currentIndex by remember { mutableIntStateOf(0) }
     val showLargeTitle by remember { derivedStateOf { currentIndex < 4 } }
     val titleFontSize by animateFloatAsState(
@@ -74,17 +94,21 @@ fun FavoriteScreen(
     )
     val focusRequester = remember { FocusRequester() }
     val defaultFocusRequester = remember { FocusRequester() }
-    val gridFocusRestorer = rememberTvLazyListFocusRestorer(defaultFocusRequester)
+    val gridDefaultFocusRequester = remember { FocusRequester() }
+    val gridFocusRestorer = rememberTvLazyListFocusRestorer(gridDefaultFocusRequester)
     var focusOnTabs by remember { mutableStateOf(true) }
     var focusOnGrid by remember { mutableStateOf(false) }
     val lazyGridState = rememberLazyGridState()
+    val favoriteTopNavItems = favoriteViewModel.favoriteFolderMetadataList.map(::FavoriteFolderTopNavItem)
 
-    val currentTabIndex by remember {
-        derivedStateOf {
-            if (favoriteViewModel.favoriteFolderMetadataList.indexOf(favoriteViewModel.currentFavoriteFolderMetadata) >= 0) favoriteViewModel.favoriteFolderMetadataList.indexOf(
-                favoriteViewModel.currentFavoriteFolderMetadata
-            ) else 0
-        }
+    var deleteMode by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var selectedVideo by remember { mutableStateOf<VideoCardData?>(null) }
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    val focusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
+    fun getFocusRequester(index: Int): FocusRequester {
+        return focusRequesters.getOrPut(index) { FocusRequester() }
     }
 
     val updateCurrentFavoriteFolder: (folderMetadata: FavoriteFolderMetadata) -> Unit =
@@ -96,12 +120,13 @@ fun FavoriteScreen(
         }
 
     BackHandler(
-        enabled = focusOnGrid
+        enabled = focusOnGrid && !deleteMode && !showPageTitle
     ) {
         scope.launch(Dispatchers.Main) {
             lazyGridState.scrollToItem(0)
-            defaultFocusRequester.requestFocus()
+            delay(100)
             focusOnGrid = false
+            defaultFocusRequester.requestFocus()
         }
     }
 
@@ -113,6 +138,14 @@ fun FavoriteScreen(
                 delay(100)
                 defaultFocusRequester.requestFocus()
             }
+        }
+    }
+
+    fun focusTopTabIfListEmpty() {
+        if (favoriteViewModel.favorites.isEmpty()) {
+            deleteMode = false
+            focusOnGrid = false
+            defaultFocusRequester.requestFocus(scope)
         }
     }
 
@@ -130,121 +163,291 @@ fun FavoriteScreen(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Bottom,
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "${stringResource(R.string.user_homepage_favorite)} - ${favoriteViewModel.currentFavoriteFolderMetadata?.title}",
+                            text = stringResource(R.string.user_homepage_favorite),
                             fontSize = titleFontSize.sp
                         )
-                        Text(
-                            text = stringResource(
-                                R.string.load_data_count,
-                                favoriteViewModel.favorites.size
-                            ),
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+                        Column (
+                            modifier = Modifier.weight(1f),
+                        ){
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = stringResource(
+                                    R.string.load_data_count,
+                                    favoriteViewModel.favorites.size
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.End,
+                            )
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = if (deleteMode) stringResource(R.string.delete_mode_action_hint) else stringResource(R.string.delete_mode_hint),
+                                color = if (deleteMode) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
                 }
             }
         }
     ) { innerPadding ->
-        ProvideListBringIntoViewSpec(padding = 24.dp) {
-            LazyVerticalGrid(
-                modifier = gridFocusRestorer.containerModifier(
-                    Modifier
-                        .padding(innerPadding)
-                        .blockDownFocusExitAtGridEnd(
-                            currentIndex = currentIndex,
-                            itemCount = favoriteViewModel.favorites.size,
-                            columnCount = 4
-                        )
-                ),
-                state = lazyGridState,
-                columns = GridCells.Fixed(4),
-                contentPadding = PaddingValues(
-                    top = if (showPageTitle) 24.dp else 4.dp,
-                    bottom = 24.dp,
-                    start = 24.dp,
-                    end = 24.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                item(
-                    span = { GridItemSpan(4) }
+        Column(
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            TopNav(
+                modifier = Modifier
+                    .focusRequester(defaultFocusRequester)
+                    .onFocusChanged { focusOnTabs = it.hasFocus }
+                    .onDelayFocusChanged(50) {
+                        if (focusOnTabs) {
+                            focusRequester.requestFocus()
+                        }
+                    },
+                paddingTop = 0.dp,
+                items = favoriteTopNavItems,
+                useSmallSize = !showPageTitle,
+                initialSelectedItem = favoriteTopNavItems.firstOrNull {
+                    it.folderMetadata == favoriteViewModel.currentFavoriteFolderMetadata
+                },
+                navSwitchMode = navSwitchMode,
+                tabFocusRequester = focusRequester,
+                onSelectedChanged = { selectedItem ->
+                    val folderMetadata = (selectedItem as FavoriteFolderTopNavItem).folderMetadata
+                    if (favoriteViewModel.currentFavoriteFolderMetadata != folderMetadata) {
+                        updateCurrentFavoriteFolder(folderMetadata)
+                    }
+                }
+            )
+
+            if (!showPageTitle) {
+                Text(
+                    modifier = Modifier
+                        .offset(y = (-6).dp)
+                        .fillMaxWidth()
+                        .height(14.dp),
+                    text = if (deleteMode) stringResource(R.string.delete_mode_action_hint) else stringResource(R.string.delete_mode_hint),
+                    color = if (deleteMode) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.End,
+                    lineHeight = 14.sp
+                )
+            }
+
+            ProvideListBringIntoViewSpec(padding = 24.dp) {
+                LazyVerticalGrid(
+                    modifier = gridFocusRestorer.containerModifier(
+                        Modifier
+                            .weight(1f)
+                            .blockDownFocusExitAtGridEnd(
+                                currentIndex = currentIndex,
+                                itemCount = favoriteViewModel.favorites.size,
+                                columnCount = 4
+                            )
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP &&
+                                    (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU ||
+                                     keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DEL)
+                                ) {
+                                    deleteMode = !deleteMode
+                                    return@onPreviewKeyEvent true
+                                }
+                                if (deleteMode && keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_BACK) {
+                                    if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
+                                        deleteMode = false
+                                    }
+                                    return@onPreviewKeyEvent true
+                                }
+                                false
+                            }
+                    ),
+                    state = lazyGridState,
+                    columns = GridCells.Fixed(4),
+                    contentPadding = PaddingValues(
+                        top = if (showPageTitle) 20.dp else 0.dp,
+                        bottom = 20.dp,
+                        start = 20.dp,
+                        end = 20.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(13.dp)
                 ) {
-                    TabRow(
-                        modifier = Modifier
-                            .focusRequester(defaultFocusRequester)
-                            .onFocusChanged { focusOnTabs = it.hasFocus }
-                            .onDelayFocusChanged(50) {
-                                if (focusOnTabs) {
-                                    focusRequester.requestFocus()
+                    itemsIndexed(
+                        items = favoriteViewModel.favorites,
+                        key = { _, history -> history.stableItemKey() }
+                    ) { index, history ->
+                        SmallVideoCard(
+                            modifier = gridFocusRestorer.firstItemModifier(index)
+                                .focusRequester(getFocusRequester(index)),
+                            data = history,
+                            onClick = {
+                                if (deleteMode) {
+                                    selectedVideo = history
+                                    selectedIndex = index
+                                    showDeleteConfirmDialog = true
+                                } else {
+                                    videoInfoRepository.preloadedVideoList.clear()
+                                    videoInfoRepository.preloadedVideoList.addAll(favoriteViewModel.favorites)
+                                    if (history.jumpToSeason) {
+                                        SeasonInfoActivity.actionStart(
+                                            context = context,
+                                            epId = history.epId,
+                                            seasonId = history.seasonId,
+                                            proxyArea = ProxyArea.checkProxyArea(history.title)
+                                        )
+                                    } else {
+                                        VideoInfoActivity.actionStart(
+                                            context = context,
+                                            aid = history.avid,
+                                            proxyArea = ProxyArea.checkProxyArea(history.title)
+                                        )
+                                    }
                                 }
                             },
-                        selectedTabIndex = currentTabIndex,
-                        separator = { Spacer(modifier = Modifier.width(12.dp)) },
-                    ) {
-                        favoriteViewModel.favoriteFolderMetadataList.forEachIndexed { index, folderMetadata ->
-                            Tab(
-                                modifier = Modifier
-                                    .onDelayFocusChanged {
-                                        if (it.isFocused && favoriteViewModel.currentFavoriteFolderMetadata != folderMetadata) {
-                                            updateCurrentFavoriteFolder(folderMetadata)
+                            onLongClick = {
+                                if (deleteMode) {
+                                    val nextIndex = if (index < favoriteViewModel.favorites.size - 1) index + 1 else index - 1
+                                    if (nextIndex >= 0) runCatching { getFocusRequester(nextIndex).requestFocus() }
+                                    val aid = history.avid
+                                    val folderId = favoriteViewModel.currentFavoriteFolderMetadata?.id
+                                    scope.launch {
+                                        if (folderId != null) {
+                                            val success = VideoUserActionManager.delVideoFromFavoriteFolder(aid = aid, folderId = folderId)
+                                            if (success) {
+                                                favoriteViewModel.removeFavoriteFromList(aid)
+                                                focusTopTabIfListEmpty()
+                                                context.getString(R.string.favorite_delete_success).toast(context)
+                                            } else {
+                                                context.getString(R.string.favorite_delete_failed).toast(context)
+                                            }
                                         }
                                     }
-                                    .ifElse(
-                                        index == currentTabIndex,
-                                        Modifier.focusRequester(focusRequester)
-                                    ),
-                                selected = currentTabIndex == index,
-                                onFocus = {},
-                                onClick = { updateCurrentFavoriteFolder(folderMetadata) }
-                            ) {
-                                Box(
-                                    modifier = Modifier.height(32.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        modifier = Modifier
-                                            .padding(horizontal = 16.dp, vertical = 6.dp),
-                                        text = folderMetadata.title,
-                                        color = LocalContentColor.current,
-                                        style = MaterialTheme.typography.labelLarge
+                                } else {
+                                    UpInfoActivity.actionStart(
+                                        context,
+                                        mid = history.upId,
+                                        name = history.upName,
+                                        face = history.upFace
                                     )
                                 }
+                            },
+                            onFocus = {
+                                focusOnGrid = true
+                                currentIndex = index
+                                //预加载
+                                if (index + 12 > favoriteViewModel.favorites.size) {
+                                    favoriteViewModel.updateFolderItems()
+                                }
+                            }
+                        )
+                    }
+
+                    if (
+                        favoriteViewModel.favorites.isEmpty() &&
+                        favoriteViewModel.currentFavoriteFolderMetadata != null &&
+                        !favoriteViewModel.updatingFolders &&
+                        !favoriteViewModel.updatingFolderItems
+                    ) {
+                        item(span = { GridItemSpan(4) }) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.no_data),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                )
                             }
                         }
                     }
                 }
-                itemsIndexed(
-                    items = favoriteViewModel.favorites,
-                    key = { index, history -> "$index-${history.stableItemKey()}" }
-                ) { index, history ->
-                    SmallVideoCard(
-                        modifier = gridFocusRestorer.firstItemModifier(index),
-                        data = history,
-                        onClick = { VideoInfoActivity.actionStart(context, history.avid) },
-                        onLongClick = {
-                            UpInfoActivity.actionStart(
-                                context,
-                                mid = history.upId,
-                                name = history.upName,
-                                face = history.upFace
-                            )
-                        },
-                        onFocus = {
-                            focusOnGrid = true
-                            currentIndex = index
-                            //预加载
-                            if (index + 12 > favoriteViewModel.favorites.size) {
-                                favoriteViewModel.updateFolderItems()
-                            }
-                        }
-                    )
-                }
             }
         }
     }
+
+    if (showDeleteConfirmDialog && selectedVideo != null) {
+        DeleteFavoriteConfirmDialog(
+            show = showDeleteConfirmDialog,
+            videoTitle = selectedVideo!!.title,
+            onConfirm = {
+                val nextIndex = if (selectedIndex < favoriteViewModel.favorites.size - 1) selectedIndex + 1 else selectedIndex - 1
+                if (nextIndex >= 0) runCatching { getFocusRequester(nextIndex).requestFocus() }
+                val aid = selectedVideo!!.avid
+                val folderId = favoriteViewModel.currentFavoriteFolderMetadata?.id
+                showDeleteConfirmDialog = false
+                selectedVideo = null
+                scope.launch {
+                    if (folderId != null) {
+                        val success = VideoUserActionManager.delVideoFromFavoriteFolder(aid = aid, folderId = folderId)
+                        if (success) {
+                            favoriteViewModel.removeFavoriteFromList(aid)
+                            focusTopTabIfListEmpty()
+                            context.getString(R.string.favorite_delete_success).toast(context)
+                        } else {
+                            context.getString(R.string.favorite_delete_failed).toast(context)
+                        }
+                    }
+                }
+            },
+            onDismiss = {
+                showDeleteConfirmDialog = false
+                scope.launch {
+                    runCatching { getFocusRequester(selectedIndex).requestFocus() }
+                }
+                selectedVideo = null
+            }
+        )
+    }
+}
+
+private data class FavoriteFolderTopNavItem(
+    val folderMetadata: FavoriteFolderMetadata
+) : TopNavItem {
+    override fun getDisplayName(context: Context): String {
+        return folderMetadata.title
+    }
+}
+
+@Composable
+private fun DeleteFavoriteConfirmDialog(
+    show: Boolean,
+    videoTitle: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(show) {
+        if (show) focusRequester.requestFocus()
+    }
+
+    TvAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.favorite_delete_confirm_dialog_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    R.string.favorite_delete_confirm_dialog_text,
+                    videoTitle
+                )
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(text = stringResource(R.string.favorite_delete_confirm_dialog_confirm))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                modifier = Modifier.focusRequester(focusRequester),
+                onClick = onDismiss
+            ) {
+                Text(text = stringResource(R.string.favorite_delete_confirm_dialog_dismiss))
+            }
+        }
+    )
 }

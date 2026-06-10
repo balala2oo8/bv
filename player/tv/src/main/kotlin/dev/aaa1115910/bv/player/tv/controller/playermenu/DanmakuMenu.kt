@@ -48,6 +48,7 @@ fun DanmakuMenuList(
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
     onDanmakuRollingDurationFactorChange: (Float) -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit,
     onFocusStateChange: (MenuFocusState) -> Unit
 ) {
     val context = LocalContext.current
@@ -70,7 +71,7 @@ fun DanmakuMenuList(
                     modifier = menuItemsModifier,
                     value = videoPlayerConfigData.currentDanmakuRollingDurationFactor,
                     step = 0.1f,
-                    range = 0.5f..1.5f,
+                    range = 0.2f..1.8f,
                     text = "${(videoPlayerConfigData.currentDanmakuRollingDurationFactor * 100).roundToInt() / 100f}x",
                     onValueChange = onDanmakuRollingDurationFactorChange,
                     onFocusBackToParent = { onFocusStateChange(MenuFocusState.Menu) }
@@ -167,6 +168,24 @@ fun DanmakuMenuList(
                         parentMenuFocusRequester.requestFocus()
                     }
                 )
+
+                VideoPlayerDanmakuMenuItem.FilterLevel -> {
+                    val (minValue, maxValue) = if (videoPlayerConfigData.isLive) 0 to 60 else 0 to 10
+                    val currentValue = if (videoPlayerConfigData.isLive)
+                        videoPlayerConfigData.currentLiveDanmakuFilterLevel
+                    else
+                        videoPlayerConfigData.currentDanmakuFilterLevel
+
+                    StepLessMenuItem(
+                        modifier = menuItemsModifier,
+                        value = currentValue.toFloat(),
+                        step = 1f,
+                        range = minValue.toFloat()..maxValue.toFloat(),
+                        text = "过滤<${currentValue}的",
+                        onValueChange = { onDanmakuFilterLevelChange(it.toInt()) },
+                        onFocusBackToParent = { onFocusStateChange(MenuFocusState.Menu) }
+                    )
+                }
             }
         }
 
@@ -199,7 +218,7 @@ fun DanmakuMenuList(
                             index == 0,
                             Modifier.focusRequester(parentMenuPositionFocusRequester)
                         ),
-                    text = item.getDisplayName(context),
+                    text = item.getDisplayName(context, isLive = videoPlayerConfigData.isLive),
                     selected = selectedDanmakuMenuItem == item,
                     onClick = {},
                     onFocus = { selectedDanmakuMenuItem = item },

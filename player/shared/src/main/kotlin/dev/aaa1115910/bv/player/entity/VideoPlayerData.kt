@@ -86,6 +86,7 @@ data class VideoPlayerHistoryData(
 data class VideoPlayerPaymentData(
     val needPay: Boolean = false,
     val epid: Int = 0,
+    val showPreviewTip: Boolean = false,
 )
 
 data class VideoPlayerLoadStateData(
@@ -123,14 +124,18 @@ data class VideoPlayerConfigData(
     val currentDanmakuArea: Float = 1f,
     val currentDanmakuMask: Boolean = false,
     val currentDanmakuRollingDurationFactor: Float = 1f,
+    val currentDanmakuFilterLevel: Int = 0,
+    val currentLiveDanmakuFilterLevel: Int = 0,
     val currentSubtitleId: Long = 0,
     val currentSubtitleData: List<SubtitleItem> = emptyList(),
     val currentSubtitleFontSize: TextUnit = 24.sp,
     val currentSubtitleBackgroundOpacity: Float = 0.4f,
     val currentSubtitleBottomPadding: Dp = 12.dp,
-    val currentPlayMode: PlayMode = PlayMode.Sequential,
+    val currentPlayMode: PlayMode = PlayMode.PartAndEpisode,
     val incognitoMode: Boolean = false,
-    var isLoop: Boolean = false,
+    val hasPreloadedVideoList: Boolean = false,
+    val hasRelatedVideos: Boolean = false,
+    val fromSeason: Boolean = false,
     var showDanmaku: Boolean = true,
     var showRelatedVideos: Boolean = false,
     var showNextVideoBtn: Boolean = false,
@@ -142,6 +147,11 @@ data class VideoPlayerConfigData(
     val currentLiveQn: Int = 0,
     val currentLiveQualityDescription: String = "",
     val controllerButtonsOrder: String = "",
+    val availableLiveCodecs: List<LiveCodec> = LiveCodec.entries,
+    val currentLiveCodec: LiveCodec = LiveCodec.HLS,
+    val showDebugInfo: Boolean = false,
+    val longPressAction: Int = 0, // 0 = 打开菜单, 1 = 加速播放
+    val longPressSpeed: Float = 2f,
 )
 
 data class VideoPlayerDanmakuMasksData(

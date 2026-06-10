@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import dev.aaa1115910.biliapi.entity.user.DynamicVideo
+import dev.aaa1115910.bv.R as SharedR
 import dev.aaa1115910.bv.tv.component.LoadingTip
 import dev.aaa1115910.bv.entity.carddata.VideoCardData
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
@@ -48,10 +49,12 @@ import dev.aaa1115910.bv.tv.component.videocard.SmallVideoCard
 import dev.aaa1115910.bv.tv.util.blockDownFocusExitAtGridEnd
 import dev.aaa1115910.bv.tv.util.ProvideListBringIntoViewSpec
 import dev.aaa1115910.bv.tv.util.rememberTvLazyListFocusRestorer
+import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.viewmodel.home.DynamicViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @Composable
 fun DynamicsScreen(
@@ -61,18 +64,32 @@ fun DynamicsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val videoInfoRepository: VideoInfoRepository = koinInject()
     val listFocusRestorer = rememberTvLazyListFocusRestorer()
     var currentFocusedIndex by remember { mutableIntStateOf(-1) }
     val shouldLoadMore by remember {
         derivedStateOf { dynamicViewModel.dynamicVideoList.isNotEmpty() && currentFocusedIndex + 12 > dynamicViewModel.dynamicVideoList.size }
     }
-    val showTip by remember {
-        derivedStateOf { dynamicViewModel.dynamicVideoList.isNotEmpty() && currentFocusedIndex >= 0 }
-    }
-
     val onClickVideo: (DynamicVideo) -> Unit = { dynamic ->
         val proxyArea = ProxyArea.checkProxyArea(dynamic.title)
         val hasSeasonHint = dynamic.seasonId != null || dynamic.epid != null
+
+        videoInfoRepository.preloadedVideoList.clear()
+        videoInfoRepository.preloadedVideoList.addAll(
+            dynamicViewModel.dynamicVideoList.map { item ->
+                VideoCardData(
+                    avid = item.aid,
+                    title = item.title,
+                    cover = item.cover,
+                    upName = item.author,
+                    upId = item.authorId,
+                    play = item.play,
+                    danmaku = item.danmaku,
+                    time = item.duration * 1000L,
+                    pubTime = item.pubTime
+                )
+            }
+        )
 
         if (hasSeasonHint) {
             SeasonInfoActivity.actionStart(
@@ -111,15 +128,13 @@ fun DynamicsScreen(
     if (dynamicViewModel.isLogin) {
         val padding = dimensionResource(R.dimen.grid_padding)
         val spacedBy = dimensionResource(R.dimen.grid_spacedBy)
-        if (showTip) {
-            Text(
-                modifier = Modifier.fillMaxWidth().offset(x = (-20).dp, y = (-8).dp),
-                text = stringResource(R.string.entry_follow_screen),
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                fontSize = 12.sp,
-                textAlign = TextAlign.End
-            )
-        }
+        Text(
+            modifier = Modifier.fillMaxWidth().offset(x = (-20).dp, y = (-8).dp),
+            text = stringResource(R.string.entry_follow_screen),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.End
+        )
         ProvideListBringIntoViewSpec {
             LazyVerticalGrid(
                 modifier = listFocusRestorer.containerModifier(modifier.fillMaxSize())
@@ -175,6 +190,24 @@ fun DynamicsScreen(
                     )
                 }
 
+                if (
+                    dynamicViewModel.dynamicVideoList.isEmpty() &&
+                    !dynamicViewModel.loadingVideo &&
+                    !dynamicViewModel.videoHasMore
+                ) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(SharedR.string.no_data),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+
                 if (dynamicViewModel.loadingVideo) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Box(
@@ -186,7 +219,7 @@ fun DynamicsScreen(
                     }
                 }
 
-                if (!dynamicViewModel.videoHasMore) {
+                if (!dynamicViewModel.videoHasMore && dynamicViewModel.dynamicVideoList.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = "没有更多了捏",

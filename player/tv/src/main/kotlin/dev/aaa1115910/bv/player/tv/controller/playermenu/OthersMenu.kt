@@ -39,6 +39,7 @@ import dev.aaa1115910.bv.util.ifElse
 fun OthersMenuList(
     modifier: Modifier = Modifier,
     onPlayModeChange: (PlayMode) -> Unit,
+    onDebugInfoChange: (Boolean) -> Unit = {},
     onFocusStateChange: (MenuFocusState) -> Unit
 ) {
     val context = LocalContext.current
@@ -57,17 +58,41 @@ fun OthersMenuList(
             .padding(horizontal = 8.dp)
         AnimatedVisibility(visible = focusState.focusState != MenuFocusState.MenuNav) {
             when (selectedOthersMenuItem) {
-                VideoPlayerOthersMenuItem.PlayMode -> RadioMenuList(
-                    modifier = menuItemsModifier,
-                    items = PlayMode.entries.map { it.getDisplayName(context) },
-                    selected = PlayMode.entries
-                        .indexOfFirst { it.ordinal == videoPlayerConfigData.currentPlayMode.ordinal },
-                    onSelectedChanged = { onPlayModeChange(PlayMode.entries[it]) },
-                    onFocusBackToParent = {
-                        onFocusStateChange(MenuFocusState.Menu)
-                        parentMenuFocusRequester.requestFocus()
+                VideoPlayerOthersMenuItem.PlayMode -> {
+                    val availableModes = PlayMode.entries.filter { mode ->
+                        when (mode) {
+                            PlayMode.ListOrder -> videoPlayerConfigData.hasPreloadedVideoList && !videoPlayerConfigData.fromSeason
+                            PlayMode.ListOrderReverse -> videoPlayerConfigData.hasPreloadedVideoList && !videoPlayerConfigData.fromSeason
+                            PlayMode.RelatedVideo -> videoPlayerConfigData.hasRelatedVideos && !videoPlayerConfigData.fromSeason
+                            else -> true
+                        }
                     }
-                )
+                    val effectivePlayMode = if (videoPlayerConfigData.currentPlayMode in availableModes)
+                        videoPlayerConfigData.currentPlayMode else PlayMode.PartAndEpisode
+                    RadioMenuList(
+                        modifier = menuItemsModifier,
+                        items = availableModes.map { it.getDisplayName(context) },
+                        selected = availableModes.indexOf(effectivePlayMode),
+                        onSelectedChanged = { onPlayModeChange(availableModes[it]) },
+                        onFocusBackToParent = {
+                            onFocusStateChange(MenuFocusState.Menu)
+                            parentMenuFocusRequester.requestFocus()
+                        }
+                    )
+                }
+
+                VideoPlayerOthersMenuItem.DebugInfo -> {
+                    RadioMenuList(
+                        modifier = menuItemsModifier,
+                        items = listOf("关闭", "开启"),
+                        selected = if (videoPlayerConfigData.showDebugInfo) 1 else 0,
+                        onSelectedChanged = { onDebugInfoChange(it == 1) },
+                        onFocusBackToParent = {
+                            onFocusStateChange(MenuFocusState.Menu)
+                            parentMenuFocusRequester.requestFocus()
+                        }
+                    )
+                }
             }
         }
 
@@ -93,7 +118,11 @@ fun OthersMenuList(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(8.dp)
         ) {
-            itemsIndexed(VideoPlayerOthersMenuItem.entries) { index, item ->
+            itemsIndexed(VideoPlayerOthersMenuItem.entries.toMutableList().apply {
+                if (videoPlayerConfigData.isLive) {
+                    remove(VideoPlayerOthersMenuItem.PlayMode)
+                }
+            }) { index, item ->
                 MenuListItem(
                     modifier = Modifier
                         .ifElse(

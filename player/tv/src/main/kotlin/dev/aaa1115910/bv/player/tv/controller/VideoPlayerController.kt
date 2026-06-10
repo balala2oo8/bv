@@ -41,6 +41,7 @@ import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.entity.LiveCodec
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerDebugInfoData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekState
@@ -53,7 +54,6 @@ import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoListItem
 import dev.aaa1115910.bv.player.entity.VideoRotation
 import dev.aaa1115910.bv.player.seekbar.SeekMoveState
-import dev.aaa1115910.bv.player.shared.BuildConfig
 import dev.aaa1115910.bv.player.shared.R
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.toast
@@ -83,6 +83,7 @@ fun VideoPlayerController(
     onPause: () -> Unit,
     onExit: () -> Unit,
     onGoTime: (time: Long) -> Unit,
+    onSeekToVideoEnd: () -> Unit,
     onBackToHistory: () -> Unit,
     onPlayNewVideo: (VideoListItem) -> Unit,
 
@@ -90,13 +91,8 @@ fun VideoPlayerController(
     onRefreshVideo: () -> Unit,
     onOpenDanmaku: () -> Unit,
     onHideDanmaku: () -> Unit,
-    onLoopPlayModeChange: (Boolean) -> Unit,
-    userActionContent: @Composable (
-        modifier: Modifier,
-        focusMap: Map<String, FocusRequester>,
-        onFocus: (String) -> Unit,
-        onPauseAutoHide: (Boolean) -> Unit
-    ) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit,
+    userActionContent: UserActionContent,
 
     //menu events
     onResolutionChange: (Resolution) -> Unit,
@@ -106,21 +102,25 @@ fun VideoPlayerController(
     onPlaySpeedChange: (Float) -> Unit,
     onAudioChange: (Audio) -> Unit,
     onLiveQualityChange: (Int) -> Unit = {},
+    onLiveCodecChange: (LiveCodec) -> Unit = {},
     onDanmakuSwitchChange: (List<DanmakuType>) -> Unit,
     onDanmakuSizeChange: (Float) -> Unit,
     onDanmakuOpacityChange: (Float) -> Unit,
     onDanmakuAreaChange: (Float) -> Unit,
     onDanmakuMaskChange: (Boolean) -> Unit,
     onDanmakuRollingDurationFactorChange: (Float) -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit = {},
     onSubtitleChange: (Subtitle) -> Unit,
     onSubtitleSizeChange: (TextUnit) -> Unit,
     onSubtitleBackgroundOpacityChange: (Float) -> Unit,
     onSubtitleBottomPadding: (Dp) -> Unit,
-    onPlayModeChange: (PlayMode) -> Unit,
     onLoadNextVideo: (Boolean) -> Unit,
+    openPlayListRequestToken: Long = 0L,
+    onDebugInfoChange: (Boolean) -> Unit = {},
 
     onRequestFocus: () -> Unit,
     onShowComment: () -> Unit = {},
+    onShowDescription: () -> Unit = {},
     content: @Composable BoxScope.() -> Unit
 ) {
     val context = LocalContext.current
@@ -140,7 +140,11 @@ fun VideoPlayerController(
 
     var lastPressBack by remember { mutableLongStateOf(0L) }
     var lastPressDown by remember { mutableLongStateOf(0L) }
+    var longPressDownTriggered by remember { mutableStateOf(false) }
     var hasFocus by remember { mutableStateOf(false) }
+    // 长按加速播放状态
+    var isLongPressSpeedUp by remember { mutableStateOf(false) }
+    var savedSpeedBeforeLongPress by remember { mutableStateOf(1f) }
 
     var goTime by remember { mutableLongStateOf(0L) }
     var seekChangeCount by remember { mutableIntStateOf(0) }
@@ -151,6 +155,10 @@ fun VideoPlayerController(
     var hideVideoInfoJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var autoSeekConfirmJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var doublePressDownJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val isSeekToVideoEnd = {
+        val duration = videoPlayerSeekState.duration
+        duration > 0L && goTime >= (duration - 1000L).coerceAtLeast(0L)
+    }
 
     val openSeekController = {
         if (!videoPlayerConfigData.isLive) {
@@ -166,8 +174,12 @@ fun VideoPlayerController(
             autoSeekConfirmJob = scope.launch {
                 delay(1000)
                 if (showSeekController) {
-                    onGoTime(goTime)
-                    if (!videoPlayer.isPlaying) onPlay()
+                    if (isSeekToVideoEnd()) {
+                        onSeekToVideoEnd()
+                    } else {
+                        onGoTime(goTime)
+                        if (!videoPlayer.isPlaying) onPlay()
+                    }
                     withContext(Dispatchers.Main) {
                         moveState = SeekMoveState.Idle
                         showSeekController = false
@@ -213,6 +225,14 @@ fun VideoPlayerController(
 
     // 对外暴露 showInfo
     LaunchedEffect(Unit) { registerShowInfoProvider { showInfo } }
+    LaunchedEffect(openPlayListRequestToken) {
+        if (openPlayListRequestToken != 0L) {
+            showInfo = false
+            showMenuController = false
+            showSeekController = false
+            showListController = true
+        }
+    }
     LaunchedEffect(showInfo, showSeekController, showListController) {
         onViewerCountTipCanShowChanged(!showInfo && !showSeekController && !showListController)
     }
@@ -272,8 +292,12 @@ fun VideoPlayerController(
 
                         if (showSeekController) {
                             if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
-                            onGoTime(goTime)
-                            if (!videoPlayer.isPlaying) onPlay()
+                            if (isSeekToVideoEnd()) {
+                                onSeekToVideoEnd()
+                            } else {
+                                onGoTime(goTime)
+                                if (!videoPlayer.isPlaying) onPlay()
+                            }
                             scope.launch(Dispatchers.Main) {
                                 moveState = SeekMoveState.Idle
                                 showSeekController = false
@@ -283,14 +307,31 @@ fun VideoPlayerController(
 
                         if (it.nativeKeyEvent.isLongPress) {
                             logger.fInfo { "[${it.key}] long press" }
-                            scope.launch(Dispatchers.Main) {
-                                showMenuController = true
+                            if (videoPlayerConfigData.longPressAction == 1) {
+                                // 加速播放模式
+                                if (!isLongPressSpeedUp) {
+                                    savedSpeedBeforeLongPress = videoPlayer.speed
+                                    videoPlayer.speed = videoPlayerConfigData.longPressSpeed
+                                    isLongPressSpeedUp = true
+                                    logger.fInfo { "Long press speed up: ${videoPlayerConfigData.longPressSpeed}x" }
+                                }
+                            } else {
+                                scope.launch(Dispatchers.Main) {
+                                    showMenuController = true
+                                }
                             }
                             return@onPreviewKeyEvent true
                         }
 
                         logger.fInfo { "[${it.key}] short press" }
                         if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                        // 长按加速松手恢复
+                        if (isLongPressSpeedUp) {
+                            videoPlayer.speed = savedSpeedBeforeLongPress
+                            isLongPressSpeedUp = false
+                            logger.fInfo { "Long press speed restored: ${savedSpeedBeforeLongPress}x" }
+                            return@onPreviewKeyEvent true
+                        }
                         if (videoPlayer.isPlaying)
                             onPause()
                         else if (videoPlayer.currentPosition >= videoPlayer.duration) {
@@ -304,8 +345,21 @@ fun VideoPlayerController(
                     // KEYCODE_CENTER_LONG
                     // 一切设备上长按 DirectionCenter 键会是这个按键事件
                     Key(763) -> {
-                        scope.launch(Dispatchers.Main) {
-                            showMenuController = true
+                        if (videoPlayerConfigData.longPressAction == 1) {
+                            if (it.type == KeyEventType.KeyDown && !isLongPressSpeedUp) {
+                                savedSpeedBeforeLongPress = videoPlayer.speed
+                                videoPlayer.speed = videoPlayerConfigData.longPressSpeed
+                                isLongPressSpeedUp = true
+                                logger.fInfo { "KEYCODE_CENTER_LONG speed up: ${videoPlayerConfigData.longPressSpeed}x" }
+                            } else if (it.type == KeyEventType.KeyUp && isLongPressSpeedUp) {
+                                videoPlayer.speed = savedSpeedBeforeLongPress
+                                isLongPressSpeedUp = false
+                                logger.fInfo { "KEYCODE_CENTER_LONG speed restored: ${savedSpeedBeforeLongPress}x" }
+                            }
+                        } else {
+                            scope.launch(Dispatchers.Main) {
+                                showMenuController = true
+                            }
                         }
                         return@onPreviewKeyEvent true
                     }
@@ -321,7 +375,22 @@ fun VideoPlayerController(
                     }
 
                     Key.DirectionDown -> {
-                        if (it.type == KeyEventType.KeyDown) return@onPreviewKeyEvent true
+                        if (it.type == KeyEventType.KeyDown) {
+                            if (it.nativeKeyEvent.isLongPress) {
+                                logger.info { "[${it.key} long press]" }
+                                longPressDownTriggered = true
+                                doublePressDownJob?.cancel()
+                                lastPressDown = 0L
+                                onLoadNextVideo(false)
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        // KeyUp 阶段
+                        // 如果之前触发过长按事件，则不执行后续逻辑
+                        if (longPressDownTriggered) {
+                            longPressDownTriggered = false
+                            return@onPreviewKeyEvent true
+                        }
                         logger.info { "[${it.key} press]" }
                         if (videoPlayerConfigData.isLive) {
                             showInfo = true
@@ -444,25 +513,49 @@ fun VideoPlayerController(
             }
     ) {
         content()
-//        if (BuildConfig.DEBUG) {
-//            Box(
-//                modifier = Modifier
-//                    .align(Alignment.TopStart)
-//                    .padding(8.dp)
-//                    .clip(MaterialTheme.shapes.medium)
-//                    .background(Color.Black.copy(alpha = 0.3f))
-//            ) {
-//                Text(
-//                    modifier = Modifier.padding(8.dp),
-//                    text = videoPlayerDebugInfoData.debugInfo
-//                )
-//            }
-//        }
+        if (videoPlayerConfigData.showDebugInfo) {
+            val debugInfo by produceState(videoPlayerDebugInfoData.debugInfo) {
+                while (true) {
+                    value = videoPlayer.debugInfo
+                    delay(1000)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(Color.Black.copy(alpha = 0.3f))
+            ) {
+                Text(
+                    modifier = Modifier.padding(8.dp),
+                    text = debugInfo,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
         BottomSubtitle()
         SkipTips()
         PlayStateTips(
             canShowPause = !showInfo && !showSeekController
         )
+        // 长按加速播放提示
+        if (isLongPressSpeedUp) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(Color.Black.copy(alpha = 0.2f))
+            ) {
+                Text(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    text = "${videoPlayerConfigData.longPressSpeed}x 加速播放中",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.55f)
+                )
+            }
+        }
         ControllerVideoInfo(
             show = showInfo,
             playSpeed = videoPlayer.speed,
@@ -506,7 +599,7 @@ fun VideoPlayerController(
                 showInfo = false
                 showMenuController = true
             },
-            onLoopPlayModeChange = onLoopPlayModeChange,
+            onPlayModeChange = onPlayModeChange,
             onRotationChange = onRotationChange,
             userActionContent = userActionContent,
             onSeekBack = {
@@ -526,7 +619,9 @@ fun VideoPlayerController(
             onSubtitleChange = onSubtitleChange,
             onLoadNextVideo = onLoadNextVideo,
             onShowComment = onShowComment,
+            onShowDescription = onShowDescription,
             onResolutionChange = onResolutionChange,
+            onAudioChange = onAudioChange,
             onLiveQualityChange = onLiveQualityChange,
             viewerCountText = viewerCountText
         )
@@ -548,17 +643,20 @@ fun VideoPlayerController(
             onPlaySpeedChange = onPlaySpeedChange,
             onAudioChange = onAudioChange,
             onLiveQualityChange = onLiveQualityChange,
+            onLiveCodecChange = onLiveCodecChange,
             onDanmakuSwitchChange = onDanmakuSwitchChange,
             onDanmakuSizeChange = onDanmakuSizeChange,
             onDanmakuOpacityChange = onDanmakuOpacityChange,
             onDanmakuAreaChange = onDanmakuAreaChange,
             onDanmakuMaskChange = onDanmakuMaskChange,
             onDanmakuRollingDurationFactorChange = onDanmakuRollingDurationFactorChange,
+            onDanmakuFilterLevelChange = onDanmakuFilterLevelChange,
             onSubtitleChange = onSubtitleChange,
             onSubtitleSizeChange = onSubtitleSizeChange,
             onSubtitleBackgroundOpacityChange = onSubtitleBackgroundOpacityChange,
             onSubtitleBottomPadding = onSubtitleBottomPadding,
-            onPlayModeChange = onPlayModeChange
+            onPlayModeChange = onPlayModeChange,
+            onDebugInfoChange = onDebugInfoChange
         )
         // 缓存底部进度条显示条件，避免频繁计算
         val shouldShowBottomProgressBar by remember { 

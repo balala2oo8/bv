@@ -9,6 +9,7 @@ import dev.aaa1115910.biliapi.entity.video.VideoDetail
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
 import dev.aaa1115910.bv.entity.carddata.VideoCardData
 import dev.aaa1115910.bv.player.entity.VideoListItem
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.player.entity.VideoListPart
 import dev.aaa1115910.bv.player.entity.VideoListUgcEpisode
 import dev.aaa1115910.bv.player.entity.VideoListUgcEpisodeTitle
@@ -93,8 +94,42 @@ class VideoDetailViewModel(
         logger.fInfo { "Update ${relateVideoCardDataList.size} relate videos" }
     }
 
+    private fun syncInteractivePlaybackContext() {
+        val detail = videoDetail
+        if (
+            detail != null &&
+            detail.isInteractive &&
+            detail.bvid.isNotBlank() &&
+            detail.interactiveGraphVersion != null
+        ) {
+            videoInfoRepository.updateInteractivePlaybackContext(
+                bvid = detail.bvid,
+                graphVersion = detail.interactiveGraphVersion,
+            )
+        } else {
+            videoInfoRepository.clearInteractivePlaybackContext()
+        }
+    }
+
     private fun updateVideoList(aid: Long) {
-        if (videoDetail?.ugcSeason != null) {
+        syncInteractivePlaybackContext()
+        if (videoDetail?.interactiveNodes?.isNotEmpty() == true) {
+            val interactiveVideoList = videoDetail!!.interactiveNodes.mapIndexed { index, node ->
+                VideoListInteractiveNode(
+                    aid = aid,
+                    cid = node.cid,
+                    title = videoDetail!!.title,
+                    partTitle = node.title,
+                    index = index,
+                    nodeId = node.nodeId,
+                    edgeId = node.edgeId,
+                    startPos = node.startPos,
+                    isCurrent = node.isCurrent,
+                )
+            }
+            videoInfoRepository.videoList.clear()
+            videoInfoRepository.videoList.addAll(interactiveVideoList)
+        } else if (videoDetail?.ugcSeason != null) {
             updateUgcSeasonSectionVideoList(0)
         } else {
             val partVideoList =
@@ -105,6 +140,8 @@ class VideoDetailViewModel(
                         title = videoDetail!!.title,
                         partTitle = videoPage.title,
                         index = index,
+                        cover = videoDetail!!.cover,
+                        duration = videoPage.duration,
                     )
                 }
             videoInfoRepository.videoList.clear()
@@ -123,7 +160,10 @@ class VideoDetailViewModel(
                             cid = videoPage.cid,
                             title = episode.title,
                             partTitle = "",
-                            index = epIndex
+                            index = epIndex,
+                            cover = episode.cover,
+                            duration = episode.duration,
+                            pubDate = episode.pubDate,
                         )
                     )
                 }
@@ -142,6 +182,9 @@ class VideoDetailViewModel(
                             title = episode.title,
                             partTitle = videoPage.title,
                             index = pageIndex,
+                            cover = episode.cover,
+                            duration = videoPage.duration,
+                            pubDate = episode.pubDate,
                         )
                     )
                 }

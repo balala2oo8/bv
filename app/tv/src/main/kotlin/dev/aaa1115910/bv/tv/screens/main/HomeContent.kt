@@ -72,6 +72,7 @@ fun HomeContent(
 ) {
     val scope = rememberCoroutineScope()
     val logger = KotlinLogging.logger("HomeContent")
+    val navSwitchMode by Prefs.navSwitchModeFlow.collectAsState(Prefs.navSwitchMode)
 
     val recommendState = rememberLazyGridState()
     val popularState = rememberLazyGridState()
@@ -216,11 +217,10 @@ fun HomeContent(
             TopNav(
                 modifier = Modifier
                     .focusRequester(navFocusRequester)
-                    .padding(end = 80.dp)
                     .onFocusChanged { topNavHasFocus = it.hasFocus },
                 items = effectiveNavItems,
-                isLargePadding = !focusOnContent && currentListOnTop,
                 initialSelectedItem = selectedTab,
+                navSwitchMode = navSwitchMode,
                 onSelectedChanged = { nav ->
                     loadJob?.cancel()
                     selectedTab = nav as HomeTopNavItem
@@ -329,21 +329,30 @@ fun HomeContent(
                     }
                     HomeTopNavItem.FollowingSeason -> {
                         if (userViewModel.isLogin) {
-                            FollowingSeasonScreen(showPageTitle = false)
+                            FollowingSeasonScreen(
+                                showPageTitle = false,
+                                topTabFocusRequester = navFocusRequester
+                            )
                         } else {
                             LoginRequiredScreen()
                         }
                     }
                     HomeTopNavItem.History -> {
                         if (userViewModel.isLogin) {
-                            HistoryScreen(showPageTitle = false)
+                            HistoryScreen(
+                                showPageTitle = false,
+                                topTabFocusRequester = navFocusRequester
+                            )
                         } else {
                             LoginRequiredScreen()
                         }
                     }
                     HomeTopNavItem.ToView -> {
                         if (userViewModel.isLogin) {
-                            ToViewScreen(showPageTitle = false)
+                            ToViewScreen(
+                                showPageTitle = false,
+                                topTabFocusRequester = navFocusRequester
+                            )
                         } else {
                             LoginRequiredScreen()
                         }

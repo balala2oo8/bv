@@ -189,10 +189,8 @@ class VideoPlayerV3Activity : ComponentActivity() {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // 显式释放播放器资源，避免依赖 ViewModel.onCleared() 的延迟回调
-        playerViewModel.videoPlayer?.release()
         if (isFinishing) {
-            playerViewModel.videoPlayer = null
-            playerViewModel.danmakuPlayer = null
+            playerViewModel.releasePlayerResources("onDestroy")
         }
 
         // 当活动被销毁时，从队列中移除该Activity的引用
@@ -216,7 +214,6 @@ class VideoPlayerV3Activity : ComponentActivity() {
     override fun onPause() {
         playerViewModel.videoPlayer?.isInBackground = true
         playerViewModel.videoPlayer?.pause()
-        playerViewModel.danmakuPlayer?.pause()
         
         // 暂停直播弹幕
         if (playerViewModel.isLive) {
@@ -224,6 +221,18 @@ class VideoPlayerV3Activity : ComponentActivity() {
         }
 
         super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // 直播从后台恢复时重新获取直播流，避免画面停留在之前的时间点
+        if (playerViewModel.isLive && playerViewModel.liveRoomId > 0) {
+            logger.info { "Resume live stream for room ${playerViewModel.liveRoomId}" }
+            playerViewModel.loadLiveStreamWithQuality(
+                playerViewModel.liveRoomId,
+                playerViewModel.currentLiveQn
+            )
+        }
     }
 
     private fun initVideoPlayer() {
@@ -239,8 +248,7 @@ class VideoPlayerV3Activity : ComponentActivity() {
             },
             enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
             enableAsyncQueueing = Prefs.enableAsyncQueueing,
-            enableTunneling = Prefs.enableTunneling,
-            showDebugInfo = Prefs.playerShowDebugInfo
+            enableScreenRefreshRateMatching = Prefs.enableScreenRefreshRateMatching
         )
         val videoPlayer = when (Prefs.playerType) {
             PlayerType.Media3 -> ExoPlayerFactory().create(this, options)

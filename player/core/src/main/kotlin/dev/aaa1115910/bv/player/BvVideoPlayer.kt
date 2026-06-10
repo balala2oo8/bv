@@ -6,6 +6,7 @@ import android.view.TextureView
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -18,7 +19,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.bv.player.impl.exo.ExoMediaPlayer
 import io.github.oshai.kotlinlogging.KotlinLogging.logger
 
@@ -29,7 +29,6 @@ fun BvVideoPlayer(
     videoPlayer: AbstractVideoPlayer,
     playerListener: VideoPlayerListener,
     rotationDegrees: Float = 0f, // 新增参数，视频旋转角度
-    danmakuPlayer: DanmakuPlayer? = null,
     forceUseTextureView: Boolean = false
 ) {
     val logger = logger("BvVideoPlayer")
@@ -39,9 +38,13 @@ fun BvVideoPlayer(
     val screenWidth = with(density) { context.resources.displayMetrics.widthPixels.toFloat() }
 
 
-    DisposableEffect(Unit) {
+    // Listener registration separated from player lifecycle
+    // so it updates when videoPlayerConfigData changes via recomposition
+    LaunchedEffect(playerListener) {
         videoPlayer.setPlayerEventListener(playerListener)
+    }
 
+    DisposableEffect(Unit) {
         onDispose {
             videoPlayer.release()
         }
@@ -92,8 +95,6 @@ fun BvVideoPlayer(
                             videoPlayer.mPlayer?.setVideoTextureView(tv)
                             videoPlayer.prepare()
                             videoPlayer.seekTo(time)
-                            danmakuPlayer?.seekTo(time)
-                            danmakuPlayer?.pause()
                             videoPlayer.start()
 
                             lastRotationDegrees = rotationDegrees

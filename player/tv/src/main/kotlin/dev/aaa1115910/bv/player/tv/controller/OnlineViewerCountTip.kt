@@ -49,7 +49,7 @@ fun OnlineViewerCountTip(
                     .padding(start = 20.dp, bottom = 32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val color = Color.White.copy(alpha = 0.6f)
+                val color = Color.White.copy(alpha = 0.55f)
 
                 Icon(
                     modifier = Modifier.scale(0.8f),
@@ -59,7 +59,7 @@ fun OnlineViewerCountTip(
                 )
                 Text(
                     modifier = Modifier.padding(start = 2.dp),
-                    text = "$count 人正在看",
+                    text = "$count 人在看",
                     style = MaterialTheme.typography.titleMedium.copy(
                         color = color,
                         fontSize = 14.sp,

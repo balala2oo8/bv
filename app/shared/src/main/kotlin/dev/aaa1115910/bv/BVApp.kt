@@ -14,6 +14,7 @@ import de.schnettler.datastore.manager.DataStoreManager
 import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
 import dev.aaa1115910.biliapi.http.util.BiliAppConf
+import dev.aaa1115910.biliapi.http.util.BiliDns
 import dev.aaa1115910.biliapi.http.util.BiliWebConf
 import dev.aaa1115910.biliapi.repositories.AuthRepository
 import dev.aaa1115910.biliapi.repositories.BiliApiModule
@@ -24,7 +25,6 @@ import dev.aaa1115910.bv.entity.db.UserDB
 import dev.aaa1115910.bv.network.HttpServer
 import dev.aaa1115910.bv.util.BlacklistUtil
 import dev.aaa1115910.bv.util.CoilConfig
-import dev.aaa1115910.bv.util.FirebaseUtil
 import dev.aaa1115910.bv.util.LogCatcherUtil
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.toast
@@ -68,9 +68,9 @@ class BVApp : Application() {
             modules(AppModule().module)
         }
         initCoil()
-        initFirebase()
         LogCatcherUtil.installLogCatcher()
         initApiConfig()
+        initDns()
         initRepository()
         initProxy()
         instance = this
@@ -87,14 +87,6 @@ class BVApp : Application() {
         Coil.setImageLoader(CoilConfig.createImageLoader(this))
     }
 
-    private fun initFirebase() {
-        FirebaseUtil.init(applicationContext)
-        when (BuildConfig.BUILD_TYPE) {
-            "debug" -> {}
-            else -> FirebaseUtil.setCrashlyticsCollectionEnabled(Prefs.enableFirebaseCollection)
-        }
-    }
-
     private fun initApiConfig() {
         BiliAppConf.osVersion = Build.VERSION.RELEASE
         BiliAppConf.model = Build.MODEL
@@ -105,6 +97,10 @@ class BVApp : Application() {
             WebViewCompat.getCurrentLoadedWebViewPackage()!!.versionName!!
                 .substringBefore(".").toInt()
         }.getOrDefault(144)
+    }
+
+    private fun initDns() {
+        BiliDns.ipv4Only = Prefs.ipv4Only
     }
 
     fun initRepository() {

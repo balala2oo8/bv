@@ -29,6 +29,7 @@
     <string name="codec_detail_video_resolution_480p">480P</string>
     <string name="codec_detail_video_resolution_720p">720P</string>
     <string name="codec_detail_video_resolution_unknown">Unknown</string>
+    <string name="codec_list_empty">未找到可用解码器</string>
 
     <string name="common_cancel">取消</string>
     <string name="common_confirm">确定</string>
@@ -51,12 +52,14 @@
 
     <string name="like_button_text">点赞</string>
     <string name="coin_button_text">投币</string>
+    <string name="toview_button_text">稍后再看</string>
 
     <string name="favorite_button_text">收藏</string>
     <string name="favorite_dialog_title">选择收藏夹</string>
 
-    <string name="filter_dialog_open_tip">长按确认键更改筛选</string>
+    <string name="filter_dialog_open_tip">在列表区域长按确认键更改筛选</string>
     <string name="filter_dialog_open_tip_click">点击打开筛选</string>
+    <string name="filter_dialog_reset">重置筛选</string>
     <string name="filter_dialog_title">筛选</string>
 
     <string name="follow_bangumi_disable_fail">取消追番失败</string>
@@ -98,7 +101,7 @@
     <string name="logout_dialog_text">是否登出账号 %1$s</string>
     <string name="logout_dialog_title">登出确认</string>
 
-    <string name="no_data">无可用数据</string>
+    <string name="no_data">暂无数据</string>
 
     <string name="pgc_home_button_unknown">占位</string>
     <string name="pgc_index_filter_area">地区</string>
@@ -206,6 +209,7 @@
     <string name="settings_item_api">接口偏好</string>
     <string name="settings_item_audio">默认音频编码</string>
     <string name="settings_item_codec">默认视频编码</string>
+    <string name="settings_item_live_codec">默认直播编码</string>
     <string name="settings_item_info">设备信息</string>
     <string name="settings_item_live">直播</string>
     <string name="settings_item_network">网络设置</string>
@@ -215,10 +219,17 @@
     <string name="settings_item_storage">存储管理</string>
     <string name="settings_item_ui">界面设置</string>
     <string name="settings_item_player">播放设置</string>
+    <string name="settings_item_danmaku_filter">弹幕过滤</string>
+    <string name="settings_player_danmaku_filter_level_title">视频弹幕过滤等级</string>
+    <string name="settings_player_danmaku_filter_level_text">过滤等级低于设定值的弹幕（0-10，0为显示全部）</string>
+    <string name="settings_live_danmaku_filter_level_title">直播弹幕过滤等级</string>
+    <string name="settings_live_danmaku_filter_level_text">过滤用户等级低于设定值的用户发的弹幕（0-60，0为显示全部）</string>
     <string name="settings_network_enable_proxy_text">使用自定义代理服务器获取部分视频播放地址</string>
     <string name="settings_network_enable_proxy_title">启用代理</string>
     <string name="settings_network_prefer_official_cdn_text">优先使用获取到的官方 CDN</string>
     <string name="settings_network_prefer_official_cdn_title">P(M)CDN 快走开</string>
+    <string name="settings_network_ipv4_only_title">仅使用 IPv4</string>
+    <string name="settings_network_ipv4_only_text">禁用 IPv6 地址解析，仅通过 IPv4 连接网络</string>
     <string name="settings_network_proxy_grpc_server_title">gRPC 接口代理服务器</string>
     <string name="settings_network_proxy_http_server_title">HTTP 接口代理服务器</string>
     <string name="settings_network_proxy_server_content_empty">未填写</string>
@@ -228,8 +239,6 @@
     <string name="settings_other_alpha_title">Alpha 版更新</string>
     <string name="settings_other_ffmpeg_audio_renderer_text">尝试使用 FFmpeg 播放硬解不兼容的音频</string>
     <string name="settings_other_ffmpeg_audio_renderer_title">启用音频软解</string>
-    <string name="settings_other_firebase_text">这将帮助开发者更快地发现与解决大部分问题</string>
-    <string name="settings_other_firebase_title">发送错误日志</string>
     <string name="settings_other_fps_text">在屏幕左上角显示 FPS，这需要重启 App</string>
     <string name="settings_other_fps_title">FPS 显示</string>
     <string name="settings_storage_calculating">计算中</string>
@@ -239,8 +248,6 @@
     <string name="settings_storage_others_cache">其他缓存</string>
     <string name="settings_ui_density_text">更改整个应用的大小缩放</string>
     <string name="settings_ui_density_title">界面缩放</string>
-    <string name="settings_ui_default_home_tab_text">设置打开应用时首页默认选中的标签</string>
-    <string name="settings_ui_default_home_tab_title">首页默认标签</string>
     <string name="settings_ui_interface_mode_text">设置启动时自动检测、强制使用 TV，或强制使用 Mobile 界面</string>
     <string name="settings_ui_interface_mode_title">界面模式</string>
     <string name="settings_ui_theme_type_text">更改主题样式</string>
@@ -252,8 +259,8 @@
     <string name="settings_ui_ugc_video_player_history_count_title">UGC 视频播放页面的历史记录数量</string>
     <string name="settings_ui_ugc_video_player_history_count_text">设置可保留历史记录的 UGC 视频播放页数量</string>
     <string name="settings_ui_home_nav_items_title">首页导航项</string>
-    <string name="settings_ui_home_nav_items_text">设置首页顶部导航项的显示顺序和隐藏状态</string>
-    <string name="settings_ui_home_nav_items_hint">使用左右键移动顺序，按确认键切换显示/隐藏（默认标签不可隐藏）</string>
+    <string name="settings_ui_home_nav_items_text">设置首页顶部导航项的显示顺序、隐藏状态、默认选中项（也是app启动时的初始页面）</string>
+    <string name="settings_ui_home_nav_items_hint">左右键排序 · 短按确认键显示/隐藏 · 长按确认键设为默认</string>
     <string name="settings_ui_home_nav_default_tag">默认</string>
     <string name="settings_ui_home_nav_visible">显示</string>
     <string name="settings_ui_home_nav_hidden">隐藏</string>
@@ -263,6 +270,13 @@
     <string name="settings_ui_pgc_nav_items_title">PGC 导航项</string>
     <string name="settings_ui_pgc_nav_items_text">设置 PGC 页顶部导航项的显示顺序和隐藏状态</string>
     <string name="settings_ui_pgc_nav_items_hint">使用左右键移动顺序，按确认键切换显示/隐藏</string>
+    <string name="settings_ui_live_nav_items_title">直播导航项</string>
+    <string name="settings_ui_live_nav_items_text">设置直播页顶部导航项的显示顺序和隐藏状态</string>
+    <string name="settings_ui_live_nav_items_hint">使用左右键移动顺序，按确认键切换显示/隐藏</string>
+    <string name="settings_ui_live_nav_items_empty_hint">请先访问直播页以加载分区数据</string>
+    <string name="settings_ui_drawer_nav_items_title">主导航项</string>
+    <string name="settings_ui_drawer_nav_items_text">设置左侧导航栏的显示顺序和隐藏状态</string>
+    <string name="settings_ui_drawer_nav_items_hint">使用左右键移动顺序，按确认键切换显示/隐藏</string>
     <string name="settings_live_enable">显示直播</string>
     <string name="settings_live_enable_desc">在侧边栏显示直播入口</string>
     <string name="settings_version_check_update_button">去更新</string>
@@ -281,6 +295,10 @@
     <string name="interface_mode_auto">自动</string>
     <string name="interface_mode_tv">TV</string>
     <string name="interface_mode_mobile">Mobile</string>
+    <string name="nav_switch_mode_auto">自动切换</string>
+    <string name="nav_switch_mode_confirm">按确认键切换</string>
+    <string name="settings_ui_nav_switch_mode_title">导航切换模式</string>
+    <string name="settings_ui_nav_switch_mode_text">设置左侧菜单和顶部标签的切换方式</string>
 
     <string name="title_activity_anime_timeline">番剧放送时间表</string>
     <string name="title_activity_favorite">个人收藏</string>
@@ -300,6 +318,41 @@
     <string name="title_activity_tag">视频标签</string>
     <string name="title_activity_toview">现在不看</string>
     <string name="title_activity_up_info">UP 投稿</string>
+    <string name="toview_delete_confirm_dialog_title">删除稍后再看</string>
+    <string name="toview_delete_confirm_dialog_text">确认删除「%1$s」吗？</string>
+    <string name="toview_delete_confirm_dialog_confirm">确认</string>
+    <string name="toview_delete_confirm_dialog_dismiss">取消</string>
+    <string name="toview_delete_success">删除成功</string>
+    <string name="toview_delete_failed">删除失败</string>
+    <string name="toview_clear_confirm_dialog_title">清空稍后再看</string>
+    <string name="toview_clear_confirm_dialog_text">确认要清空列表吗？</string>
+    <string name="toview_clear_success">清空成功</string>
+    <string name="toview_clear_failed">清空失败</string>
+    <string name="history_delete_confirm_dialog_title">删除历史记录</string>
+    <string name="history_delete_confirm_dialog_text">确认删除「%1$s」吗？</string>
+    <string name="history_delete_confirm_dialog_confirm">确认</string>
+    <string name="history_delete_confirm_dialog_dismiss">取消</string>
+    <string name="history_delete_success">删除成功</string>
+    <string name="history_delete_failed">删除失败</string>
+    <string name="history_clear_confirm_dialog_title">清空历史记录</string>
+    <string name="history_clear_confirm_dialog_text">确认要清空列表吗？</string>
+    <string name="history_clear_success">清空成功</string>
+    <string name="history_clear_failed">清空失败</string>
+    <string name="favorite_delete_confirm_dialog_title">取消收藏</string>
+    <string name="favorite_delete_confirm_dialog_text">确认取消收藏「%1$s」吗？</string>
+    <string name="favorite_delete_confirm_dialog_confirm">确认</string>
+    <string name="favorite_delete_confirm_dialog_dismiss">取消</string>
+    <string name="favorite_delete_success">取消收藏成功</string>
+    <string name="favorite_delete_failed">取消收藏失败</string>
+    <string name="following_season_delete_confirm_dialog_title">取消追番</string>
+    <string name="following_season_delete_confirm_dialog_text">确认取消追番「%1$s」吗？</string>
+    <string name="following_season_delete_confirm_dialog_confirm">确认</string>
+    <string name="following_season_delete_confirm_dialog_dismiss">取消</string>
+    <string name="following_season_delete_success">取消追番成功</string>
+    <string name="following_season_delete_failed">取消追番失败</string>
+    <string name="delete_mode_hint">在列表区域按菜单键进入删除模式</string>
+    <string name="delete_mode_action_hint">长按（或短按）确认键删除当前选中项，按返回键退出删除模式</string>
+    <string name="following_season_hint">在列表区域长按确认键更改筛选，按菜单键进入删除模式</string>
     <string name="title_activity_user_info">用户信息</string>
     <string name="title_activity_user_lock_settings">用户锁设置</string>
     <string name="title_activity_user_switch">用户切换</string>
@@ -727,8 +780,8 @@
     <string name="friend_count">关注 %1$s</string>
     <string name="settings_portrait_video_fix_mode_title">竖屏视频播放异常时的处理方式</string>
     <string name="settings_portrait_video_fix_mode_text">用来解决部分设备播放大于1080P的竖屏视频出现画面花屏/比例错误的问题</string>
-    <string name="settings_player_show_debug_info_text">在视频播放页面左下角显示视频加载过程信息</string>
-    <string name="settings_player_show_debug_info_title">显示视频加载过程信息</string>
+    <string name="settings_player_show_debug_info_text">在视频播放页面右上角显示视频调试信息</string>
+    <string name="settings_player_show_debug_info_title">显示视频调试信息</string>
     <string name="settings_player_exit_when_all_is_played_text">没有符合要求的下一个视频时，退出播放器回视频详情页</string>
     <string name="settings_player_exit_when_all_is_played_title">都播完后退出播放器</string>
     <string name="settings_show_ugc_video_info_text">关闭时，1、点击非PGC视频卡片不显示详情页直接开始播放，2、支持设置“UGC 视频播放页面的历史记录数量”</string>
@@ -741,8 +794,8 @@
     <string name="settings_player_seek_backward_step_title">视频快退时间间隔（秒）</string>
     <string name="settings_player_show_bottom_progress_bar_text">在播放器底部常驻显示迷你进度条</string>
     <string name="settings_player_show_bottom_progress_bar_title">显示迷你进度条</string>
-    <string name="settings_player_load_next_action_title">下一个播放</string>
-    <string name="settings_player_load_next_action_text">设置播放完后是否自动播放、播放哪一个</string>
+    <string name="settings_player_load_next_action_title">自定义播放模式的规则</string>
+    <string name="settings_player_load_next_action_text">设置“播放模式-自定义模式”查找下一个可播放视频的规则</string>
     <string name="settings_player_load_next_action_do_nothing">无，不播了</string>
     <string name="settings_player_load_next_action_play_recommend">推荐视频</string>
     <string name="settings_player_load_next_action_play_next_part">剧集和分P的下一个</string>

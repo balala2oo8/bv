@@ -1,50 +1,76 @@
 package dev.aaa1115910.bv.tv.screens.user
 
+import android.view.KeyEvent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Button
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.aaa1115910.bv.R
-import dev.aaa1115910.bv.tv.component.videocard.SmallVideoCard
+import dev.aaa1115910.bv.entity.carddata.VideoCardData
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
 import dev.aaa1115910.bv.tv.activities.video.UpInfoActivity
 import dev.aaa1115910.bv.tv.activities.video.VideoInfoActivity
+import dev.aaa1115910.bv.tv.component.TvAlertDialog
+import dev.aaa1115910.bv.tv.component.videocard.SmallVideoCard
 import dev.aaa1115910.bv.tv.util.ProvideListBringIntoViewSpec
 import dev.aaa1115910.bv.tv.util.rememberTvLazyListFocusRestorer
 import dev.aaa1115910.bv.tv.util.stableItemKey
+import dev.aaa1115910.bv.util.requestFocus
+import dev.aaa1115910.bv.repository.VideoInfoRepository
+import dev.aaa1115910.bv.tv.util.blockDownFocusExitAtGridEnd
 import dev.aaa1115910.bv.viewmodel.user.ToViewViewModel
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @Composable
 fun ToViewScreen(
     modifier: Modifier = Modifier,
-    ToViewViewModel: ToViewViewModel = koinViewModel(),
-    showPageTitle: Boolean = true
+    toViewViewModel: ToViewViewModel = koinViewModel(),
+    showPageTitle: Boolean = true,
+    topTabFocusRequester: FocusRequester? = null
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val videoInfoRepository: VideoInfoRepository = koinInject()
     val listFocusRestorer = rememberTvLazyListFocusRestorer()
+    val lazyGridState = rememberLazyGridState()
     var currentIndex by remember { mutableIntStateOf(0) }
     val showLargeTitle by remember { derivedStateOf { currentIndex < 4 } }
     val titleFontSize by animateFloatAsState(
@@ -52,10 +78,31 @@ fun ToViewScreen(
         label = "title font size"
     )
 
+    var deleteMode by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var selectedVideo by remember { mutableStateOf<VideoCardData?>(null) }
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    var focusTopTabWhenListEmpty by remember { mutableStateOf(false) }
+
+    val focusRequesters = remember { mutableMapOf<Int, FocusRequester>() }
+    fun getFocusRequester(index: Int): FocusRequester {
+        return focusRequesters.getOrPut(index) { FocusRequester() }
+    }
+
     LaunchedEffect(Unit) {
-        if (ToViewViewModel.histories.isEmpty()) {
-            ToViewViewModel.clearData()
-            ToViewViewModel.update()
+        if (toViewViewModel.histories.isEmpty()) {
+            toViewViewModel.clearData()
+            toViewViewModel.update()
+        }
+    }
+
+    LaunchedEffect(toViewViewModel.deleting, toViewViewModel.histories.size, focusTopTabWhenListEmpty) {
+        if (!focusTopTabWhenListEmpty || toViewViewModel.deleting) return@LaunchedEffect
+        focusTopTabWhenListEmpty = false
+        if (toViewViewModel.histories.isEmpty()) {
+            deleteMode = false
+            topTabFocusRequester?.requestFocus(scope)
         }
     }
 
@@ -80,11 +127,11 @@ fun ToViewScreen(
                             text = stringResource(R.string.title_activity_toview),
                             fontSize = titleFontSize.sp
                         )
-                        if (ToViewViewModel.noMore) {
+                        if (toViewViewModel.noMore) {
                             Text(
                                 text = stringResource(
                                     R.string.load_data_count_no_more,
-                                    ToViewViewModel.histories.size
+                                    toViewViewModel.histories.size
                                 ),
                                 color = Color.White.copy(alpha = 0.6f)
                             )
@@ -92,7 +139,7 @@ fun ToViewScreen(
                             Text(
                                 text = stringResource(
                                     R.string.load_data_count,
-                                    ToViewViewModel.histories.size
+                                    toViewViewModel.histories.size
                                 ),
                                 color = Color.White.copy(alpha = 0.6f)
                             )
@@ -102,43 +149,257 @@ fun ToViewScreen(
             }
         }
     ) { innerPadding ->
-        ProvideListBringIntoViewSpec(padding = 26.dp) {
-            LazyVerticalGrid(
-                modifier = listFocusRestorer.containerModifier(Modifier.padding(innerPadding)),
+        Column(modifier = Modifier.padding(innerPadding)) {
+            Text(
+                modifier = Modifier.fillMaxWidth().offset(x = (-20).dp, y = (-2).dp),
+                text = if (deleteMode) stringResource(R.string.delete_mode_action_hint) else stringResource(R.string.delete_mode_hint),
+                color = if (deleteMode) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                fontSize = 11.sp,
+                textAlign = TextAlign.End
+            )
+            ProvideListBringIntoViewSpec(padding = 24.dp) {
+                LazyVerticalGrid(
+                    modifier = listFocusRestorer.containerModifier(
+                        Modifier.blockDownFocusExitAtGridEnd(
+                            currentIndex = currentIndex,
+                            itemCount = toViewViewModel.histories.size,
+                            columnCount = 4
+                        )
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP &&
+                                (keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_MENU ||
+                                 keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DEL)
+                            ) {
+                                deleteMode = !deleteMode
+                                return@onPreviewKeyEvent true
+                            }
+                            if (deleteMode && keyEvent.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_BACK) {
+                                if (keyEvent.nativeKeyEvent.action == KeyEvent.ACTION_UP) {
+                                    deleteMode = false
+                                }
+                                return@onPreviewKeyEvent true
+                            }
+                            false
+                        }
+                ),
                 columns = GridCells.Fixed(4),
-                contentPadding = PaddingValues(24.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
+                state = lazyGridState,
+                contentPadding = PaddingValues(
+                    top = if (showPageTitle) 20.dp else 4.dp,
+                    bottom = 20.dp,
+                    start = 20.dp,
+                    end = 20.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(13.dp)
             ) {
                 itemsIndexed(
-                    items = ToViewViewModel.histories,
-                    key = { index, item -> "$index-${item.stableItemKey()}" }
+                    items = toViewViewModel.histories,
+                    key = { _, item -> item.avid }
                 ) { index, item ->
                     Box(
                         contentAlignment = Alignment.Center
                     ) {
                         SmallVideoCard(
-                            modifier = listFocusRestorer.firstItemModifier(index),
+                            modifier = listFocusRestorer.firstItemModifier(index)
+                                .focusRequester(getFocusRequester(index)),
                             data = item,
                             onClick = {
-                                VideoInfoActivity.actionStart(
-                                    context = context,
-                                    aid = item.avid,
-                                    proxyArea = ProxyArea.checkProxyArea(item.title)
-                                )
+                                if (deleteMode) {
+                                    selectedVideo = item
+                                    selectedIndex = index
+                                    showDeleteConfirmDialog = true
+                                } else {
+                                    videoInfoRepository.preloadedVideoList.clear()
+                                    videoInfoRepository.preloadedVideoList.addAll(toViewViewModel.histories)
+                                    VideoInfoActivity.actionStart(
+                                        context = context,
+                                        aid = item.avid,
+                                        proxyArea = ProxyArea.checkProxyArea(item.title)
+                                    )
+                                }
                             },
-                            onLongClick = { UpInfoActivity.actionStart( context, mid = item.upId, name = item.upName, face = item.upFace ) },
+                            onLongClick = {
+                                if (deleteMode) {
+                                    selectedIndex = index
+                                    showClearConfirmDialog = true
+                                } else {
+                                    UpInfoActivity.actionStart(
+                                        context,
+                                        mid = item.upId,
+                                        name = item.upName,
+                                        face = item.upFace
+                                    )
+                                }
+                            },
                             onFocus = {
                                 currentIndex = index
                                 //预加载
-                                // if (index + 12 > ToViewViewModel.histories.size) {
-                                //     ToViewViewModel.update()
+                                // if (index + 12 > toViewViewModel.histories.size) {
+                                //     toViewViewModel.update()
                                 // }
                             }
                         )
                     }
                 }
+
+                if (toViewViewModel.histories.isEmpty() && toViewViewModel.noMore) {
+                    item(span = { GridItemSpan(4) }) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = stringResource(R.string.no_data),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
             }
         }
+        }
     }
+
+    if (showDeleteConfirmDialog && selectedVideo != null) {
+        DeleteToViewConfirmDialog(
+            show = showDeleteConfirmDialog,
+            videoTitle = selectedVideo!!.title,
+            onConfirm = {
+                if (topTabFocusRequester != null) {
+                    focusTopTabWhenListEmpty = true
+                }
+                val nextIndex = if (selectedIndex < toViewViewModel.histories.size - 1) selectedIndex + 1 else selectedIndex - 1
+                if (nextIndex >= 0) runCatching { getFocusRequester(nextIndex).requestFocus() }
+                toViewViewModel.deleteToView(
+                    avid = selectedVideo!!.avid
+                )
+                showDeleteConfirmDialog = false
+                selectedVideo = null
+            },
+            onDismiss = {
+                showDeleteConfirmDialog = false
+                scope.launch {
+                    runCatching { getFocusRequester(selectedIndex).requestFocus() }
+                }
+                selectedVideo = null
+            }
+        )
+    }
+
+    if (showClearConfirmDialog) {
+        ClearToViewConfirmDialog(
+            show = showClearConfirmDialog,
+            onConfirm = {
+                if (topTabFocusRequester != null) {
+                    focusTopTabWhenListEmpty = true
+                }
+                toViewViewModel.clearToView()
+                deleteMode = false
+                showClearConfirmDialog = false
+            },
+            onDismiss = {
+                showClearConfirmDialog = false
+                scope.launch {
+                    runCatching { getFocusRequester(selectedIndex).requestFocus() }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DeleteToViewConfirmDialog(
+    show: Boolean,
+    videoTitle: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(show) {
+        if (show) focusRequester.requestFocus()
+    }
+
+    TvAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.toview_delete_confirm_dialog_title)) },
+        text = {
+            Text(
+                text = stringResource(
+                    R.string.toview_delete_confirm_dialog_text,
+                    videoTitle
+                )
+            )
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(text = stringResource(R.string.toview_delete_confirm_dialog_confirm))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                modifier = Modifier.focusRequester(focusRequester),
+                onClick = onDismiss
+            ) {
+                Text(text = stringResource(R.string.toview_delete_confirm_dialog_dismiss))
+            }
+        }
+    )
+}
+
+@Composable
+private fun ClearToViewConfirmDialog(
+    show: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    var consumeInitialConfirmKeyUp by remember { mutableStateOf(false) }
+
+    fun handleInitialConfirmKeyUp(keyEvent: androidx.compose.ui.input.key.KeyEvent): Boolean {
+        if (!consumeInitialConfirmKeyUp) return false
+        val nativeKeyEvent = keyEvent.nativeKeyEvent
+        val isConfirmKey = nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            nativeKeyEvent.keyCode == KeyEvent.KEYCODE_ENTER ||
+            nativeKeyEvent.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+        if (nativeKeyEvent.action == KeyEvent.ACTION_UP && isConfirmKey) {
+            consumeInitialConfirmKeyUp = false
+            return true
+        }
+        return false
+    }
+
+    LaunchedEffect(show) {
+        if (show) {
+            consumeInitialConfirmKeyUp = true
+            focusRequester.requestFocus()
+        }
+    }
+
+    TvAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.toview_clear_confirm_dialog_title)) },
+        text = {
+            Text(text = stringResource(R.string.toview_clear_confirm_dialog_text))
+        },
+        confirmButton = {
+            Button(
+                modifier = Modifier.onPreviewKeyEvent { handleInitialConfirmKeyUp(it) },
+                onClick = onConfirm
+            ) {
+                Text(text = stringResource(R.string.toview_delete_confirm_dialog_confirm))
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                modifier = Modifier
+                    .focusRequester(focusRequester)
+                    .onPreviewKeyEvent { handleInitialConfirmKeyUp(it) },
+                onClick = onDismiss
+            ) {
+                Text(text = stringResource(R.string.toview_delete_confirm_dialog_dismiss))
+            }
+        }
+    )
 }

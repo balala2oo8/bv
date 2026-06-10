@@ -14,17 +14,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.KeyboardDoubleArrowDown
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -62,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Comment
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.ArrowDropUp
 import androidx.compose.material.icons.twotone.ScreenRotation
@@ -77,8 +79,10 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.aaa1115910.biliapi.entity.video.Subtitle
+import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerClockState
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
+import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.parseControllerButtonsOrder
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekState
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekThumbData
@@ -124,20 +128,17 @@ fun ControllerVideoInfo(
     onOpenPlayList: () -> Unit,
     onOpenRelatedVideo: () -> Unit,
     onOpenSetting: () -> Unit,
-    onLoopPlayModeChange: (Boolean) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit,
     onRotationChange: (VideoRotation) -> Unit,
-    userActionContent: @Composable (
-        modifier: Modifier,
-        focusMap: Map<String, FocusRequester>,
-        onFocus: (String) -> Unit,
-        onPauseAutoHide: (Boolean) -> Unit
-    ) -> Unit = { _, _, _, _ -> },
+    userActionContent: UserActionContent = EmptyUserActionContent,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onSubtitleChange: (Subtitle) -> Unit,
     onLoadNextVideo: (Boolean) -> Unit,
     onShowComment: () -> Unit = {},
+    onShowDescription: () -> Unit = {},
     onResolutionChange: (Resolution) -> Unit = {},
+    onAudioChange: (Audio) -> Unit = {},
     onLiveQualityChange: (Int) -> Unit = {},
     viewerCountText: String = "",
 ) {
@@ -148,25 +149,6 @@ fun ControllerVideoInfo(
     val videoPlayerVideoInfoData = LocalVideoPlayerVideoInfoData.current
     val videoPlayerStateData = LocalVideoPlayerStateData.current
     val videoPlayerConfigData = LocalVideoPlayerConfigData.current
-
-//    var seekHideTimer: CountDownTimer? by remember { mutableStateOf(null) }
-//    val setCloseInfoTimer: () -> Unit = {
-//        if (show) {
-//            seekHideTimer?.cancel()
-//            seekHideTimer = object : CountDownTimer(5000, 1000) {
-//                override fun onTick(millisUntilFinished: Long) {}
-//                override fun onFinish() = onHideInfo()
-//            }
-//            seekHideTimer?.start()
-//        } else {
-//            seekHideTimer?.cancel()
-//            seekHideTimer = null
-//        }
-//    }
-//
-//    LaunchedEffect(Unit) {
-//        setCloseInfoTimer()
-//    }
 
     Box(
         modifier = modifier.fillMaxSize()
@@ -212,7 +194,9 @@ fun ControllerVideoInfo(
                 upName = videoPlayerVideoInfoData.upName,
                 pubTime = videoPlayerVideoInfoData.pubTime,
                 isPlaying = videoPlayerStateData.isPlaying || videoPlayerStateData.isBuffering,
-                isLoop = videoPlayerConfigData.isLoop,
+                currentPlayMode = videoPlayerConfigData.currentPlayMode,
+                hasPreloadedVideoList = videoPlayerConfigData.hasPreloadedVideoList,
+                hasRelatedVideos = videoPlayerConfigData.hasRelatedVideos,
                 showDanmaku = videoPlayerConfigData.showDanmaku,
                 onPlay = onPlay,
                 onPause = onPause,
@@ -224,7 +208,7 @@ fun ControllerVideoInfo(
                 onOpenPlayList = onOpenPlayList,
                 onOpenRelatedVideo = onOpenRelatedVideo,
                 onOpenSetting = onOpenSetting,
-                onLoopPlayModeChange = onLoopPlayModeChange,
+                onPlayModeChange = onPlayModeChange,
                 onRotationChange = onRotationChange,
                 fromSeason = videoPlayerVideoInfoData.fromSeason,
                 isLive = videoPlayerConfigData.isLive,
@@ -241,9 +225,13 @@ fun ControllerVideoInfo(
                 showNextVideoBtn = videoPlayerConfigData.showNextVideoBtn,
                 onLoadNextVideo = onLoadNextVideo,
                 onShowComment = onShowComment,
+                onShowDescription = onShowDescription,
                 availableResolutions = videoPlayerConfigData.availableResolutions,
                 currentResolution = videoPlayerConfigData.currentResolution,
                 onResolutionChange = onResolutionChange,
+                availableAudio = videoPlayerConfigData.availableAudio,
+                currentAudio = videoPlayerConfigData.currentAudio,
+                onAudioChange = onAudioChange,
                 availableLiveQualities = videoPlayerConfigData.availableLiveQualities,
                 currentLiveQn = videoPlayerConfigData.currentLiveQn,
                 currentLiveQualityDescription = videoPlayerConfigData.currentLiveQualityDescription,
@@ -303,7 +291,9 @@ fun ControllerVideoInfoBottom(
     upName: String,
     pubTime: String,
     isPlaying: Boolean,
-    isLoop: Boolean,
+    currentPlayMode: PlayMode,
+    hasPreloadedVideoList: Boolean = false,
+    hasRelatedVideos: Boolean = false,
     showDanmaku: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
@@ -315,17 +305,12 @@ fun ControllerVideoInfoBottom(
     onOpenPlayList: () -> Unit,
     onOpenRelatedVideo: () -> Unit,
     onOpenSetting: () -> Unit,
-    onLoopPlayModeChange: (Boolean) -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit,
     onRotationChange: (VideoRotation) -> Unit,
     fromSeason: Boolean = false,
     isLive: Boolean = false,
     isFollowingUp: Boolean = false,
-    userActionContent: @Composable (
-        modifier: Modifier,
-        focusMap: Map<String, FocusRequester>,
-        onFocus: (String) -> Unit,
-        onPauseAutoHide: (Boolean) -> Unit
-    ) -> Unit = { _, _, _, _ -> },
+    userActionContent: UserActionContent = EmptyUserActionContent,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     availableSubtitleTracks: List<Subtitle> = emptyList(),
@@ -334,9 +319,13 @@ fun ControllerVideoInfoBottom(
     showNextVideoBtn: Boolean = false,
     onLoadNextVideo: (Boolean) -> Unit,
     onShowComment: () -> Unit = {},
+    onShowDescription: () -> Unit = {},
     availableResolutions: List<Resolution> = emptyList(),
     currentResolution: Resolution = Resolution.R240P,
     onResolutionChange: (Resolution) -> Unit = {},
+    availableAudio: List<Audio> = emptyList(),
+    currentAudio: Audio = Audio.A192K,
+    onAudioChange: (Audio) -> Unit = {},
     availableLiveQualities: List<Pair<Int, String>> = emptyList(),
     currentLiveQn: Int = 0,
     currentLiveQualityDescription: String = "",
@@ -352,6 +341,8 @@ fun ControllerVideoInfoBottom(
     var showRotationDialog by remember { mutableStateOf(false) }
     var showSubtitleDialog by remember { mutableStateOf(false) }
     var showQualityDialog by remember { mutableStateOf(false) }
+    var showAudioDialog by remember { mutableStateOf(false) }
+    var showPlayModeDialog by remember { mutableStateOf(false) }
     var speed by remember { mutableFloatStateOf(playSpeed) }
     val danmakuIconId = if (showDanmaku) R.drawable.ic_danmaku_on else R.drawable.ic_danmaku_hide
     val subtitleIconId = if (currentSubtitleId > -1) R.drawable.ic_subtitle_on else R.drawable.ic_subtitle_off
@@ -361,8 +352,20 @@ fun ControllerVideoInfoBottom(
     }
 
     val currentQualityText = if (isLive) currentLiveQualityDescription.ifEmpty { "画质" } else currentResolution.getShortDisplayName(context).ifEmpty { "画质" }
+    val currentAudioText = currentAudio.getDisplayName(context).ifEmpty { "音质" }
 
-    val buttons = remember(isLive, fromSeason, showDanmaku, isLoop, speed, rotation, currentSubtitleId, isFollowingUp, showNextVideoBtn, currentLiveQualityDescription, currentResolution, availableResolutions, buttonConfigs) {
+    val playModeIconId = when (currentPlayMode) {
+        PlayMode.SingleVideo -> R.drawable.ic_play_mode_single
+        PlayMode.SingleLoop -> R.drawable.ic_play_mode_single_loop
+        PlayMode.ListOrder -> R.drawable.ic_play_mode_list_order
+        PlayMode.ListOrderReverse -> R.drawable.ic_play_mode_list_order_reverse
+        PlayMode.PartAndEpisode -> R.drawable.ic_play_mode_part_and_episode
+        PlayMode.PartAndEpisodeReverse -> R.drawable.ic_play_mode_part_and_episode_reverse
+        PlayMode.RelatedVideo -> R.drawable.ic_play_mode_related_video
+        PlayMode.Custom -> R.drawable.ic_play_mode_custom
+    }
+
+    val buttons = remember(isLive, fromSeason, showDanmaku, currentPlayMode, speed, rotation, currentSubtitleId, isFollowingUp, showNextVideoBtn, currentLiveQualityDescription, currentResolution, availableResolutions, currentAudio, availableAudio, buttonConfigs) {
         val rawButtons = listOf(
             ControlButton(
                 id = "nextVideo",
@@ -391,6 +394,13 @@ fun ControllerVideoInfoBottom(
                 visible = (isLive && availableLiveQualities.isNotEmpty()) || (!isLive && availableResolutions.isNotEmpty())
             ),
             ControlButton(
+                id = "audio",
+                text = currentAudioText,
+                onClick = { showAudioDialog = true },
+                width = 56,
+                visible = !isLive && availableAudio.size > 1
+            ),
+            ControlButton(
                 id = "upSpace",
                 painterId = upSpaceIconId,
                 scale = 0.72f,
@@ -414,8 +424,15 @@ fun ControllerVideoInfoBottom(
                 id = "comment",
                 icon = Icons.Outlined.Comment,
                 scale = 0.95f,
-                onClick = onShowComment,
+                onClick = { onHideInfo(); onShowComment() },
                 fontWeight = FontWeight.Bold,
+                visible = !isLive
+            ),
+            ControlButton(
+                id = "description",
+                icon = Icons.Outlined.Info,
+                scale = 0.95f,
+                onClick = { onHideInfo(); onShowDescription() },
                 visible = !isLive
             ),
             ControlButton(
@@ -424,9 +441,9 @@ fun ControllerVideoInfoBottom(
                 onClick = { if (showDanmaku) onHideDanmaku() else onOpenDanmaku() }
             ),
             ControlButton(
-                id = "loop",
-                icon = if (isLoop) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
-                onClick = { onLoopPlayModeChange(!isLoop) },
+                id = "playMode",
+                painterId = playModeIconId,
+                onClick = { showPlayModeDialog = true },
                 visible = !isLive
             ),
             ControlButton(
@@ -483,13 +500,14 @@ fun ControllerVideoInfoBottom(
         }.toMutableMap()
     }
 
-    // user action focus requesters (由 Controller 提供给调用方)。创建默认的三项：like/fav/coin
+    // user action focus requesters (由 Controller 提供给调用方)。创建默认的四项：like/fav/coin/toview
     val userActionFocusRequesters = remember {
         mutableStateOf(
             mapOf(
-                "like" to FocusRequester(),
-                "fav" to FocusRequester(),
-                "coin" to FocusRequester()
+                UserActionKey.Like to FocusRequester(),
+                UserActionKey.Favorite to FocusRequester(),
+                UserActionKey.Coin to FocusRequester(),
+                UserActionKey.ToView to FocusRequester()
             )
         )
     }
@@ -535,7 +553,7 @@ fun ControllerVideoInfoBottom(
 
     fun scheduleHideJob() {
         cancelHideJob()
-        if (show && !showSpeedDialog && !showRotationDialog && !showSubtitleDialog && !showQualityDialog && !pauseAutoHide) {
+        if (show && !showSpeedDialog && !showRotationDialog && !showSubtitleDialog && !showQualityDialog && !showAudioDialog && !showPlayModeDialog && !pauseAutoHide) {
             hideVideoInfoJob = scope.launch {
                 delay(5000)
                 withContext(Dispatchers.Main) { onHideInfo() }
@@ -543,7 +561,7 @@ fun ControllerVideoInfoBottom(
         }
     }
 
-    LaunchedEffect(show, showSpeedDialog, showRotationDialog, showSubtitleDialog, showQualityDialog, pauseAutoHide) {
+    LaunchedEffect(show, showSpeedDialog, showRotationDialog, showSubtitleDialog, showQualityDialog, showAudioDialog, showPlayModeDialog, pauseAutoHide) {
         scheduleHideJob()
     }
 
@@ -591,7 +609,7 @@ fun ControllerVideoInfoBottom(
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-        // 当前注入的是：点赞、收藏、投币
+        // 当前注入的是：点赞、收藏、投币、稍后再看
         if (!isLive) {
             userActionContent(
                 Modifier.focusProperties {
@@ -618,7 +636,7 @@ fun ControllerVideoInfoBottom(
                     seekbarHasFocus = it.isFocused
                 }
                 .focusProperties {
-                    up = userActionFocusRequesters.value["like"] ?: FocusRequester()
+                    up = userActionFocusRequesters.value[UserActionKey.Like] ?: FocusRequester()
                     down = defaultFocusButtonId?.let { focusRequesters[it] } ?: FocusRequester()
                 }
                 .ifElse(!isLive, Modifier.focusable())
@@ -788,6 +806,118 @@ fun ControllerVideoInfoBottom(
                 currentResolution = currentResolution,
                 onResolutionChange = onResolutionChange
             )
+        }
+    }
+
+    if (showAudioDialog && availableAudio.isNotEmpty()) {
+        AudioDialog(
+            onHideDialog = { showAudioDialog = false },
+            availableAudio = availableAudio,
+            currentAudio = currentAudio,
+            onAudioChange = onAudioChange
+        )
+    }
+
+    if (showPlayModeDialog) {
+        PlayModeDialog(
+            onHideDialog = { showPlayModeDialog = false },
+            currentPlayMode = currentPlayMode,
+            hasPreloadedVideoList = hasPreloadedVideoList,
+            hasRelatedVideos = hasRelatedVideos,
+            fromSeason = fromSeason,
+            onPlayModeChange = onPlayModeChange
+        )
+    }
+}
+
+@Composable
+private fun PlayModeDialog(
+    modifier: Modifier = Modifier,
+    currentPlayMode: PlayMode,
+    hasPreloadedVideoList: Boolean,
+    hasRelatedVideos: Boolean,
+    fromSeason: Boolean = false,
+    onHideDialog: () -> Unit,
+    onPlayModeChange: (PlayMode) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val availableModes = remember(hasPreloadedVideoList, hasRelatedVideos, fromSeason) {
+        PlayMode.entries.filter { mode ->
+            when (mode) {
+                PlayMode.ListOrder -> hasPreloadedVideoList && !fromSeason
+                PlayMode.ListOrderReverse -> hasPreloadedVideoList && !fromSeason
+                PlayMode.RelatedVideo -> hasRelatedVideos && !fromSeason
+                else -> true
+            }
+        }
+    }
+    val effectivePlayMode = if (currentPlayMode in availableModes) currentPlayMode else PlayMode.PartAndEpisode
+    val focusRequesters = remember(availableModes) { availableModes.associateWith { FocusRequester() } }
+    var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    fun touch() { lastInteractionTime = System.currentTimeMillis() }
+
+    LaunchedEffect(effectivePlayMode) {
+        focusRequesters[effectivePlayMode]?.requestFocus(scope)
+    }
+
+    LaunchedEffect(lastInteractionTime) {
+        val base = lastInteractionTime
+        delay(15000)
+        if (base == lastInteractionTime) onHideDialog()
+    }
+
+    Dialog(onDismissRequest = { onHideDialog() }) {
+        Surface(
+            modifier = modifier
+                .width(240.dp)
+                .heightIn(max = 300.dp),
+            color = Color.Black.copy(alpha = 0.5f),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(
+                    text = stringResource(R.string.video_player_menu_others_play_mode),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 18.sp
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(availableModes) { mode ->
+                        val selected = mode == effectivePlayMode
+                        Button(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp)
+                                .focusRequester(focusRequesters[mode]!!),
+                            shape = ButtonDefaults.shape(MaterialTheme.shapes.medium),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ButtonDefaults.colors(
+                                containerColor = if (selected) MaterialTheme.colorScheme.inverseSurface.copy(
+                                    alpha = 0.4f
+                                ) else Color.Transparent,
+                                contentColor = Color.White,
+                                focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+                                focusedContentColor = Color.Black
+                            ),
+                            onClick = { touch(); onPlayModeChange(mode); }
+                        ) {
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = mode.getDisplayName(context),
+                                textAlign = TextAlign.Center,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1173,6 +1303,86 @@ private fun ResolutionDialog(
 }
 
 @Composable
+private fun AudioDialog(
+    modifier: Modifier = Modifier,
+    availableAudio: List<Audio>,
+    currentAudio: Audio,
+    onHideDialog: () -> Unit,
+    onAudioChange: (Audio) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val audioList = remember(availableAudio) {
+        availableAudio.sortedBy { it.ordinal }
+    }
+    val focusRequesters = remember { audioList.associateWith { FocusRequester() } }
+    val effectiveCurrentAudio = remember(currentAudio, audioList) {
+        if (audioList.contains(currentAudio)) currentAudio else audioList.first()
+    }
+    var lastInteractionTime by remember { mutableStateOf(System.currentTimeMillis()) }
+
+    fun touch() { lastInteractionTime = System.currentTimeMillis() }
+
+    LaunchedEffect(effectiveCurrentAudio) {
+        focusRequesters[effectiveCurrentAudio]?.requestFocus(scope)
+    }
+
+    LaunchedEffect(lastInteractionTime) {
+        val base = lastInteractionTime
+        delay(15000)
+        if (base == lastInteractionTime) onHideDialog()
+    }
+
+    Dialog(onDismissRequest = { onHideDialog() }) {
+        Surface(
+            modifier = modifier
+                .width(240.dp),
+            color = Color.Black.copy(alpha = 0.5f),
+            shape = MaterialTheme.shapes.medium
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(
+                    text = "音频质量",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 18.sp
+                )
+
+                Column {
+                    audioList.forEach { audio ->
+                        val selected = audio == effectiveCurrentAudio
+                        Button(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp, start = 8.dp, end = 8.dp)
+                                .focusRequester(focusRequesters[audio]!!),
+                            shape = ButtonDefaults.shape(MaterialTheme.shapes.medium),
+                            scale = ButtonDefaults.scale(focusedScale = 1f),
+                            colors = ButtonDefaults.colors(
+                                containerColor = if (selected) MaterialTheme.colorScheme.inverseSurface.copy(
+                                    alpha = 0.4f
+                                ) else Color.Transparent,
+                                contentColor = Color.White,
+                                focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+                                focusedContentColor = Color.Black
+                            ),
+                            onClick = { touch(); onAudioChange(audio) }
+                        ) {
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = audio.getDisplayName(context),
+                                textAlign = TextAlign.Center,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun Clock(
     modifier: Modifier = Modifier,
     hour: Int,
@@ -1264,7 +1474,7 @@ private fun ControllerVideoInfoPreview() {
                 onOpenPlayList = {},
                 onOpenRelatedVideo = {},
                 onOpenSetting = {},
-                onLoopPlayModeChange = {},
+                onPlayModeChange = {},
                 onRotationChange = {},
                 userActionContent = { _, _, _, _ ->
                     // User action buttons go here

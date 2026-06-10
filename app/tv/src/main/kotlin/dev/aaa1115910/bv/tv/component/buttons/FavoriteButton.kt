@@ -2,12 +2,14 @@ package dev.aaa1115910.bv.tv.component.buttons
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonBorder
 import androidx.tv.material3.ButtonColors
@@ -40,10 +44,12 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.FilterChip
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import dev.aaa1115910.biliapi.entity.FavoriteFolderMetadata
 import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.tv.component.TvAlertDialog
+import dev.aaa1115910.bv.tv.manager.VideoUserActionManager
 import dev.aaa1115910.bv.ui.theme.BVTheme
 import dev.aaa1115910.bv.util.swapList
 import kotlinx.coroutines.delay
@@ -52,7 +58,6 @@ import kotlinx.coroutines.delay
 fun FavoriteButton(
     modifier: Modifier = Modifier,
     isFavorite: Boolean,
-    userFavoriteFolders: List<FavoriteFolderMetadata> = emptyList(),
     favoriteFolderIds: List<Long> = emptyList(),
     onAddToDefaultFavoriteFolder: () -> Unit,
     onUpdateFavoriteFolders: (List<Long>) -> Unit,
@@ -62,6 +67,7 @@ fun FavoriteButton(
     onDialogVisibilityChanged: (Boolean) -> Unit = {},
     dialogContainerColor: Color = AlertDialogDefaults.containerColor
 ) {
+    val userFavoriteFolders by VideoUserActionManager.getFavoriteFoldersFlow().collectAsState()
     var showFavoriteDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(showFavoriteDialog) {
@@ -161,31 +167,34 @@ private fun FavoriteDialog(
             text = {
                 FlowRow(
                     modifier = Modifier
-                        .heightIn(max = 320.dp)
+                        .width(550.dp)
                         .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     userFavoriteFolders.forEachIndexed { index, userFavoriteFolder ->
                         val selected = selectedFavoriteFolderIds.contains(userFavoriteFolder.id)
-                        var hasFocus by remember { mutableStateOf(false) }
+                        val isDefault = userFavoriteFolder.title == "默认收藏夹"
 
                         val itemModifier =
                             if (index == 0) Modifier.focusRequester(defaultFocusRequester)
                             else Modifier
 
                         FilterChip(
-                            modifier = itemModifier.onFocusChanged {
-                                hasFocus = it.hasFocus
-                                if (it.hasFocus) touch()
-                            },
+                            modifier = itemModifier
+                                .onFocusChanged {
+                                    if (it.hasFocus) touch()
+                                },
+                            enabled = isDefault || selected || userFavoriteFolder.mediaCount < 1000,
                             selected = selected,
                             onClick = {
                                 if (selectedFavoriteFolderIds.contains(userFavoriteFolder.id)) {
                                     selectedFavoriteFolderIds.remove(userFavoriteFolder.id)
+                                    userFavoriteFolder.mediaCount -= 1
                                 } else {
                                     selectedFavoriteFolderIds.add(userFavoriteFolder.id)
+                                    userFavoriteFolder.mediaCount += 1
                                 }
                                 onUpdateFavoriteFolders(selectedFavoriteFolderIds)
                                 // 点击交互更新最后交互时间
@@ -203,7 +212,22 @@ private fun FavoriteDialog(
                                 }
                             }
                         ) {
-                            Text(text = userFavoriteFolder.title)
+                            Column {
+                                Text(
+                                    text = userFavoriteFolder.title,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontSize = 15.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                )
+                                Text(
+                                    text = "${userFavoriteFolder.mediaCount}${if (!isDefault) "/1000" else ""}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 10.sp,
+                                        lineHeight = 11.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }

@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -163,13 +164,15 @@ fun SeasonInfoScreen(
     var paused by remember { mutableStateOf(false) }
     var showSeasonSelector by remember { mutableStateOf(false) }
     var showCommentPanel by remember { mutableStateOf(false) }
-    val defaultFocusRequester = remember { FocusRequester() }
     val commentButtonFocusRequester = remember { FocusRequester() }
+    val playButtonFocusRequester = remember { FocusRequester() }
 
     val onClickVideo: (avid: Long, cid: Long, epid: Int, episodeTitle: String, startTime: Int) -> Unit =
         { avid, cid, epid, episodeTitle, startTime ->
             logger.debug { "onClickVideo: [avid=$avid, cid=$cid, epid=$epid, episodeTitle=$episodeTitle, startTime=$startTime]" }
             if (cid != 0L) {
+                videoInfoRepository.description = seasonViewModel.seasonData?.description ?: ""
+                videoInfoRepository.tags = emptyList()
                 launchPlayerActivity(
                     context = context,
                     avid = avid,
@@ -249,9 +252,9 @@ fun SeasonInfoScreen(
         seasonViewModel.seasonData?.let {
             logger.fInfo { "season data change: ${seasonViewModel.seasonData}" }
             seasonViewModel.lastPlayProgress = it.userStatus.progress
-            //请求默认焦点到剧集封面上
+            //请求默认焦点到播放按钮上
             delay(300)
-            defaultFocusRequester.requestFocus(scope)
+            playButtonFocusRequester.requestFocus(scope)
         }
     }
 
@@ -306,7 +309,7 @@ fun SeasonInfoScreen(
             ) {
                 item {
                     SeasonInfoPart(
-                        modifier = Modifier.focusRequester(defaultFocusRequester),
+                        playButtonFocusRequester = playButtonFocusRequester,
                         title = seasonData.title,
                         cover = seasonData.cover,
                         newEpDesc = seasonData.newEpDesc,
@@ -389,6 +392,9 @@ fun SeasonInfoScreen(
                                             "第 ${episode.title.toInt()} 集"
                                         }.getOrDefault(episode.title) + " " + episode.longTitle,
                                         index = index,
+                                        cover = episode.cover,
+                                        duration = episode.duration / 1000,
+                                        pubDate = episode.pubDate
                                     )
                                 }
                                 videoInfoRepository.videoList.clear()
@@ -423,6 +429,9 @@ fun SeasonInfoScreen(
                                                 "第 ${episode.title.toInt()} 集"
                                             }.getOrDefault(episode.title) + " " + episode.longTitle,
                                             index = index,
+                                            cover = episode.cover,
+                                            duration = episode.duration,
+                                        pubDate = episode.pubDate
                                         )
                                     } ?: emptyList()
                                 videoInfoRepository.videoList.clear()
@@ -451,6 +460,9 @@ fun SeasonInfoScreen(
                                             "第 ${episode.title.toInt()} 集"
                                         }.getOrDefault(episode.title) + " " + episode.longTitle,
                                         index = index,
+                                        cover = episode.cover,
+                                        duration = episode.duration,
+                                        pubDate = episode.pubDate
                                     )
                                 }
                                 videoInfoRepository.videoList.clear()
@@ -471,7 +483,7 @@ fun SeasonInfoScreen(
         onHideSelector = {
             showSeasonSelector = false
             runCatching {
-                defaultFocusRequester.requestFocus(scope)
+                playButtonFocusRequester.requestFocus(scope)
             }
         },
         currentSeasonId = seasonViewModel.seasonId ?: 0,
@@ -577,7 +589,8 @@ fun SeasonBaseInfo(
     onPlay: () -> Unit,
     onClickFollow: (follow: Boolean) -> Unit,
     onShowComment: () -> Unit = {},
-    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() }
+    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() },
+    playButtonFocusRequester: FocusRequester
 ) {
     Column(
         modifier = modifier
@@ -607,7 +620,8 @@ fun SeasonBaseInfo(
             onPlay = onPlay,
             onClickFollow = onClickFollow,
             onShowComment= onShowComment,
-            commentButtonFocusRequester = commentButtonFocusRequester
+            commentButtonFocusRequester = commentButtonFocusRequester,
+            playButtonFocusRequester = playButtonFocusRequester,
         )
     }
 }
@@ -629,7 +643,8 @@ fun SeasonInfoPart(
     onClickFollow: (follow: Boolean) -> Unit,
     onClickCover: () -> Unit,
     onShowComment: () -> Unit = {},
-    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() }
+    commentButtonFocusRequester: FocusRequester = remember { FocusRequester() },
+    playButtonFocusRequester: FocusRequester
 ) {
     Row(
         modifier = modifier
@@ -654,7 +669,8 @@ fun SeasonInfoPart(
             onPlay = onPlay,
             onClickFollow = onClickFollow,
             onShowComment = onShowComment,
-            commentButtonFocusRequester = commentButtonFocusRequester
+            commentButtonFocusRequester = commentButtonFocusRequester,
+            playButtonFocusRequester = playButtonFocusRequester
         )
     }
 }
@@ -672,7 +688,6 @@ fun SeasonEpisodeButton(
     onClick: () -> Unit
 ) {
     val isPreview = LocalInspectionMode.current
-    val borderColor = if (isLastPlayed) Color(0xFFE39B17) else null
 
     Surface(
         modifier = modifier,
@@ -684,24 +699,20 @@ fun SeasonEpisodeButton(
         scale = ClickableSurfaceDefaults.scale(scale = 1f, focusedScale = 1f),
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
         border = ClickableSurfaceDefaults.border(
-            border = borderColor?.let {
+            border = if (isLastPlayed) {
                 Border(
-                    border = BorderStroke(2.dp, it),
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     shape = MaterialTheme.shapes.medium
                 )
-            } ?: Border.None,
-            focusedBorder = borderColor?.let {
-                Border(
-                    border = BorderStroke(2.dp, it),
-                    shape = MaterialTheme.shapes.medium
-                )
-            } ?: Border.None,
-            pressedBorder = borderColor?.let {
-                Border(
-                    border = BorderStroke(2.dp, it),
-                    shape = MaterialTheme.shapes.medium
-                )
-            } ?: Border.None
+            } else Border.None,
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                shape = MaterialTheme.shapes.medium
+            ),
+            pressedBorder = Border(
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                shape = MaterialTheme.shapes.medium
+            )
         ),
         onClick = onClick
     ) {
@@ -901,6 +912,52 @@ fun SeasonEpisodesDialog(
 }
 
 @Composable
+private fun SeasonEpisodeRowButton(
+    modifier: Modifier = Modifier,
+    hasFocus: Boolean = true,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (hasFocus) 1f else 0.4f,
+        label = "button scale",
+        animationSpec = tween(
+            durationMillis = 120
+        )
+    )
+
+    Surface(
+        modifier = modifier,
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+            pressedContainerColor = MaterialTheme.colorScheme.inverseSurface
+        ),
+        shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.border),
+                shape = MaterialTheme.shapes.small
+            )
+        ),
+        onClick = onClick
+    ) {
+        Box(
+            modifier = Modifier
+                .size(width = (40 * scale).dp, height = (42 * scale).dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                modifier = Modifier
+                    .size(32.dp)
+                    .rotate(90f),
+                imageVector = Icons.Rounded.ViewModule,
+                contentDescription = null
+            )
+        }
+    }
+}
+
+@Composable
 fun SeasonEpisodeRow(
     modifier: Modifier = Modifier,
     title: String,
@@ -912,7 +969,7 @@ fun SeasonEpisodeRow(
     val focusRequester = remember { FocusRequester() }
     val rowState = rememberLazyListState()
     var hasFocus by remember { mutableStateOf(false) }
-    val titleColor = if (hasFocus) Color.White else Color.White.copy(alpha = 0.6f)
+    val titleColor = if (hasFocus) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
     val titleFontSize by animateFloatAsState(
         targetValue = if (hasFocus) 30f else 14f,
         label = "title font size"
@@ -935,12 +992,21 @@ fun SeasonEpisodeRow(
             .onFocusChanged { hasFocus = it.hasFocus },
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(
+        Row(
             modifier = Modifier.padding(start = 50.dp),
-            text = title,
-            fontSize = titleFontSize.sp,
-            color = titleColor
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = titleFontSize.sp,
+                color = titleColor
+            )
+            SeasonEpisodeRowButton(
+                hasFocus = hasFocus,
+                onClick = { showEpisodesDialog = true }
+            )
+        }
 
         LazyRow(
             modifier = Modifier
@@ -950,31 +1016,6 @@ fun SeasonEpisodeRow(
             contentPadding = PaddingValues(horizontal = 32.dp),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            item {
-                Surface(
-                    modifier = modifier.size(60.dp, 80.dp),
-                    colors = ClickableSurfaceDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-                        pressedContainerColor = MaterialTheme.colorScheme.inverseSurface
-                    ),
-                    shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.medium),
-                    onClick = { showEpisodesDialog = true }
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .rotate(90f),
-                            imageVector = Icons.Rounded.ViewModule,
-                            contentDescription = null
-                        )
-                    }
-                }
-            }
             itemsIndexed(
                 items = episodes,
                 key = { index, episode -> "$index-episode-${episode.id}" }
@@ -1237,7 +1278,8 @@ fun SeasonInfoPartPreview() {
             seasonCount = 0,
             onPlay = {},
             onClickFollow = {},
-            onClickCover = {}
+            onClickCover = {},
+            playButtonFocusRequester = remember { FocusRequester() }
         )
     }
 }

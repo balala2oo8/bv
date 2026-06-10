@@ -34,10 +34,12 @@ import dev.aaa1115910.bv.tv.component.videocard.SmallVideoCard
 import dev.aaa1115910.bv.tv.util.blockDownFocusExitAtGridEnd
 import dev.aaa1115910.bv.tv.util.ProvideListBringIntoViewSpec
 import dev.aaa1115910.bv.tv.util.rememberTvLazyListFocusRestorer
+import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.viewmodel.home.RecommendViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @Composable
 fun RecommendScreen(
@@ -47,6 +49,7 @@ fun RecommendScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val videoInfoRepository: VideoInfoRepository = koinInject()
     val listFocusRestorer = rememberTvLazyListFocusRestorer()
     var currentFocusedIndex by remember { mutableIntStateOf(0) }
     val shouldLoadMore by remember {
@@ -54,6 +57,23 @@ fun RecommendScreen(
     }
 
     val onClickVideo: (UgcItem) -> Unit = { ugcItem ->
+        videoInfoRepository.preloadedVideoList.clear()
+        videoInfoRepository.preloadedVideoList.addAll(
+            recommendViewModel.recommendVideoList.map { item ->
+                VideoCardData(
+                    avid = item.aid,
+                    title = item.title,
+                    cover = item.cover,
+                    upName = item.author,
+                    upId = item.authorId,
+                    play = if (item.play == -1L) null else item.play,
+                    danmaku = if (item.danmaku == -1) null else item.danmaku,
+                    time = item.duration * 1000L,
+                    pubTime = item.pubTime,
+                    isInteractive = item.isInteractive
+                )
+            }
+        )
         VideoInfoActivity.actionStart(context, ugcItem.aid)
     }
 
@@ -109,7 +129,8 @@ fun RecommendScreen(
                             danmaku = with(item.danmaku) { if (this == -1) null else this },
                             upName = item.author,
                             time = item.duration * 1000L,
-                            pubTime = item.pubTime
+                            pubTime = item.pubTime,
+                            isInteractive = item.isInteractive
                         )
                     },
                     onClick = { onClickVideo(item) },

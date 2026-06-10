@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.Divider
@@ -90,6 +88,10 @@ fun SubCommentPanel(
     var currentPage by remember { mutableStateOf(CommentReplyPage()) }
     var hasNext by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // 全屏图片查看器状态
+    var showImageViewer by remember { mutableStateOf(false) }
+    var imageViewerPictures by remember { mutableStateOf<List<dev.aaa1115910.biliapi.entity.Picture>>(emptyList()) }
 
     // 加载子评论
     val loadReplies: (Boolean) -> Unit = { reset ->
@@ -167,7 +169,7 @@ fun SubCommentPanel(
                 modifier = Modifier
                     .fillMaxHeight()
                     .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .widthIn(min = 300.dp, max = 400.dp)
+                    .widthIn(min = 320.dp, max = 420.dp)
                     .fillMaxWidth(0.3f)
                     .clickable(enabled = true, onClick = {})
                     .onBackPressed { onHide() },
@@ -183,7 +185,15 @@ fun SubCommentPanel(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // 根评论（只读显示，右键展开/收起）
-                    SubCommentRootItem(comment = rootComment)
+                    SubCommentRootItem(
+                        comment = rootComment,
+                        onLongClick = {
+                            if (rootComment.pictures.isNotEmpty()) {
+                                imageViewerPictures = rootComment.pictures
+                                showImageViewer = true
+                            }
+                        }
+                    )
 
                     // 分隔线
                     Divider(
@@ -221,28 +231,35 @@ fun SubCommentPanel(
                                             }
                                             true
                                         }
-                                        // 下键：逐步滚动，仅在完全可见时转移焦点
+                                        // 下键：逐步滚动，在列表末尾时阻止焦点移出
                                         event.isKeyDown() && event.isDpadDown() -> {
-                                            val currentItemInfo = listState.layoutInfo.visibleItemsInfo
-                                                .firstOrNull { it.index == focusedCommentIndex }
+                                            val layoutInfo = listState.layoutInfo
 
-                                            if (currentItemInfo != null) {
-                                                val viewportEnd = listState.layoutInfo.viewportEndOffset
-                                                val itemBottom = currentItemInfo.offset + currentItemInfo.size
-
-                                                // 如果评论底部不可见，逐步滚动
-                                                if (itemBottom > viewportEnd) {
-                                                    scope.launch {
-                                                        // 每次滚动约 150dp
-                                                        val scrollAmount = with(density) { 150.dp.toPx() }
-                                                        listState.animateScrollBy(scrollAmount)
-                                                    }
-                                                    true // 拦截事件，不允许焦点转移
-                                                } else {
-                                                    false // 评论已完全可见，允许焦点转移
-                                                }
+                                            // 已聚焦到最后一条回复时，阻止焦点移出列表
+                                            if (focusedCommentIndex >= replies.size - 1 && replies.isNotEmpty()) {
+                                                true
                                             } else {
-                                                false
+                                                val currentItemInfo = layoutInfo.visibleItemsInfo
+                                                    .firstOrNull { it.index == focusedCommentIndex }
+
+                                                if (currentItemInfo != null) {
+                                                    val viewportEnd = layoutInfo.viewportEndOffset
+                                                    val itemBottom = currentItemInfo.offset + currentItemInfo.size
+
+                                                    // 如果评论底部不可见，逐步滚动
+                                                    if (itemBottom > viewportEnd) {
+                                                        scope.launch {
+                                                            // 每次滚动约 100dp
+                                                            val scrollAmount = with(density) { 100.dp.toPx() }
+                                                            listState.animateScrollBy(scrollAmount)
+                                                        }
+                                                        true // 拦截事件，不允许焦点转移
+                                                    } else {
+                                                        false // 评论已完全可见，允许焦点转移
+                                                    }
+                                                } else {
+                                                    false
+                                                }
                                             }
                                         }
                                         else -> false
@@ -263,7 +280,13 @@ fun SubCommentPanel(
                                             if (focusState.hasFocus) {
                                                 focusedCommentIndex = index
                                             }
+                                        },
+                                    onLongClick = {
+                                        if (reply.pictures.isNotEmpty()) {
+                                            imageViewerPictures = reply.pictures
+                                            showImageViewer = true
                                         }
+                                    }
                                 )
                             }
 
@@ -296,5 +319,16 @@ fun SubCommentPanel(
                 }
             }
         }
+    }
+
+    // 全屏图片查看器
+    if (showImageViewer && imageViewerPictures.isNotEmpty()) {
+        FullscreenImageViewer(
+            pictures = imageViewerPictures,
+            onDismiss = {
+                showImageViewer = false
+                imageViewerPictures = emptyList()
+            }
+        )
     }
 }

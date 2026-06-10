@@ -24,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,6 +40,7 @@ import androidx.tv.material3.darkColorScheme
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerPaymentData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import qrcode.QRCode
@@ -53,14 +56,35 @@ fun PlayStateTips(
     val videoPlayerStateData = LocalVideoPlayerStateData.current
     val videoPlayerPaymentData = LocalVideoPlayerPaymentData.current
 
+    // 追踪视频是否已经进入稳定播放状态（isPlaying && !isBuffering）。
+    // 当开始缓冲（加载新视频/rebuffer）时重置；当用户暂停时保持，确保 PauseIcon 正常显示。
+    // 配合延迟机制，同时避免 onEnd→onBuffering 间隙和缓冲结束→播放瞬时的 PauseIcon 闪现。
+    var hasEverPlayed by remember { mutableStateOf(false) }
+    LaunchedEffect(videoPlayerStateData.isPlaying, videoPlayerStateData.isBuffering) {
+        if (videoPlayerStateData.isPlaying && !videoPlayerStateData.isBuffering) {
+            hasEverPlayed = true
+        } else if (videoPlayerStateData.isBuffering && !videoPlayerStateData.isError) {
+            hasEverPlayed = false
+        }
+    }
+
+    var showPauseDelayed by remember { mutableStateOf(false) }
+    LaunchedEffect(videoPlayerStateData.isPlaying, videoPlayerStateData.isBuffering) {
+        showPauseDelayed = false
+        if (!videoPlayerStateData.isPlaying && !videoPlayerStateData.isBuffering && !videoPlayerStateData.isError) {
+            delay(200)
+            showPauseDelayed = true
+        }
+    }
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        if (!videoPlayerStateData.isPlaying && !videoPlayerStateData.isBuffering && !videoPlayerStateData.isError && canShowPause) {
+        if (!videoPlayerStateData.isPlaying && !videoPlayerStateData.isBuffering && !videoPlayerStateData.isError && canShowPause && showPauseDelayed && hasEverPlayed) {
             PauseIcon(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(24.dp)
+                    .padding(20.dp)
             )
         }
         if (videoPlayerStateData.isBuffering && !videoPlayerStateData.isError) {
@@ -76,9 +100,16 @@ fun PlayStateTips(
                 exception = videoPlayerStateData.exception!!
             )
         }
-        if (videoPlayerPaymentData.needPay) {
+        if (videoPlayerPaymentData.needPay && videoPlayerPaymentData.epid > 0) {
             PaidRequireTip(
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(20.dp)
+                    .graphicsLayer {
+                        scaleX = 0.5f
+                        scaleY = 0.5f
+                        transformOrigin = TransformOrigin(1f, 1f)
+                    },
                 epid = videoPlayerPaymentData.epid
             )
         }
@@ -99,7 +130,7 @@ fun PauseIcon(
         Icon(
             modifier = Modifier
                 .padding(12.dp, 4.dp)
-                .size(50.dp),
+                .size(46.dp),
             imageVector = Icons.Rounded.Pause,
             contentDescription = null,
             tint = Color.White
@@ -205,11 +236,11 @@ fun PaidRequireTip(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "请先购买影片",
+                text = "当前为试看片段，请购买影片",
                 style = MaterialTheme.typography.titleLarge
             )
             // TODO 使用颜文字显示影片价格
-            Text(text = "(・∀・)つ㊿")
+            // Text(text = "(・∀・)つ㊿")
             Spacer(modifier = Modifier.height(12.dp))
             AnimatedVisibility(visible = qrImage != null) {
                 Image(bitmap = qrImage!!, contentDescription = "EP$epid QR Code")

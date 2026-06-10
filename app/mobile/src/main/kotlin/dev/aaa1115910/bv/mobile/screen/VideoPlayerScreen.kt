@@ -49,6 +49,7 @@ import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
@@ -97,9 +98,8 @@ import dev.aaa1115910.bv.player.entity.LocalVideoPlayerPaymentData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekThumbData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
-import dev.aaa1115910.bv.player.entity.VideoListPart
-import dev.aaa1115910.bv.player.entity.VideoListPgcEpisode
-import dev.aaa1115910.bv.player.entity.VideoListUgcEpisode
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
+import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.entity.VideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.VideoPlayerDanmakuMasksData
 import dev.aaa1115910.bv.player.entity.VideoPlayerHistoryData
@@ -110,6 +110,7 @@ import dev.aaa1115910.bv.player.entity.VideoPlayerSeekThumbData
 import dev.aaa1115910.bv.player.entity.VideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.VideoPlayerVideoShotData
 import dev.aaa1115910.bv.player.mobile.BvPlayer
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.formatPubTimeString
@@ -119,9 +120,16 @@ import dev.aaa1115910.bv.viewmodel.CommentViewModel
 import dev.aaa1115910.bv.viewmodel.SeasonViewModel
 import dev.aaa1115910.bv.viewmodel.VideoPlayerV3ViewModel
 import dev.aaa1115910.bv.viewmodel.video.VideoDetailViewModel
+import dev.aaa1115910.bv.viewmodel.login.GeetestResult
+import com.geetest.sdk.GT3ConfigBean
+import com.geetest.sdk.GT3ErrorBean
+import com.geetest.sdk.GT3GeetestUtils
+import com.geetest.sdk.GT3Listener
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import org.json.JSONObject
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,6 +146,15 @@ fun VideoPlayerScreen(
     val systemUiController = rememberSystemUiController()
     val logger = KotlinLogging.logger("VideoPlayerScreen")
 
+    // 外部创建 DanmakuView，与 videoPlayer 一致的模式
+    val danmakuView = remember { DanmakuView(context).also { playerViewModel.danmakuView = it } }
+
+    DisposableEffect(danmakuView) {
+        onDispose {
+            danmakuView.release()
+        }
+    }
+
     var isVideoFullscreen by rememberSaveable { mutableStateOf(false) }
     val forcePortrait =
         windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact || windowSizeClass.heightSizeClass == WindowHeightSizeClass.Compact
@@ -149,6 +166,68 @@ fun VideoPlayerScreen(
         getKey = { pictures[it].key }
     )
     val replySheetState = rememberBottomSheetScaffoldState()
+
+    // 风控 Geetest 验证
+    var gt3GeetestUtils: GT3GeetestUtils? by remember { mutableStateOf(null) }
+    val gt3ConfigBean by remember { mutableStateOf(GT3ConfigBean()) }
+
+    DisposableEffect(Unit) {
+        gt3GeetestUtils = GT3GeetestUtils(context)
+        gt3ConfigBean.apply {
+            pattern = 1
+            isCanceledOnTouchOutside = false
+            lang = null
+            timeout = 10000
+            webviewTimeout = 10000
+            corners = 24
+            listener = object : GT3Listener() {
+                override fun onReceiveCaptchaCode(p0: Int) {}
+                override fun onStatistics(p0: String?) {}
+                override fun onSuccess(p0: String?) {}
+                override fun onButtonClick() {}
+
+                override fun onClosed(p0: Int) {
+                    playerViewModel.onGeetestCancelled()
+                }
+
+                override fun onFailed(p0: GT3ErrorBean?) {
+                    playerViewModel.onGeetestCancelled()
+                }
+
+                override fun onDialogResult(result: String) {
+                    runCatching {
+                        val geetestResult = Json.decodeFromString<GeetestResult>(result)
+                        gt3GeetestUtils?.showSuccessDialog()
+                        playerViewModel.onGeetestResult(
+                            challenge = geetestResult.geetestChallenge,
+                            validate = geetestResult.geetestValidate,
+                            seccode = geetestResult.geetestSeccode
+                        )
+                    }.onFailure {
+                        gt3GeetestUtils?.showFailedDialog()
+                        playerViewModel.onGeetestCancelled()
+                    }
+                }
+            }
+        }
+        gt3GeetestUtils!!.init(gt3ConfigBean)
+
+        onDispose {
+            gt3GeetestUtils?.destory()
+        }
+    }
+
+    LaunchedEffect(playerViewModel.showGeetestDialog) {
+        if (playerViewModel.showGeetestDialog) {
+            gt3GeetestUtils?.startCustomFlow()
+            gt3ConfigBean.api1Json = JSONObject().apply {
+                put("success", 1)
+                put("gt", playerViewModel.geetestGt)
+                put("challenge", playerViewModel.geetestChallenge)
+            }
+            gt3GeetestUtils?.getGeetest()
+        }
+    }
 
     val setPreviewerPictures: (List<Picture>, () -> Unit) -> Unit =
         { newPictures, afterSetPictures ->
@@ -244,6 +323,7 @@ fun VideoPlayerScreen(
                         LocalVideoPlayerPaymentData provides VideoPlayerPaymentData(
                             needPay = playerViewModel.needPay,
                             epid = playerViewModel.epid,
+                            showPreviewTip = playerViewModel.showPreviewTip,
                         ),
                         LocalVideoPlayerLoadStateData provides VideoPlayerLoadStateData(
                             loadState = playerViewModel.loadState,
@@ -298,7 +378,7 @@ fun VideoPlayerScreen(
                                 .aspectRatio(16f / 9f),
                             isFullScreen = isVideoFullscreen,
                             videoPlayer = playerViewModel.videoPlayer!!,
-                            danmakuPlayer = playerViewModel.danmakuPlayer,
+                            danmakuView = danmakuView,
                             onClearBackToHistoryData = { playerViewModel.lastPlayed = 0 },
                             onEnterFullScreen = {
                                 isVideoFullscreen = true
@@ -358,40 +438,22 @@ fun VideoPlayerScreen(
                             onLoadNextVideo = playerViewModel::playNextVideo,
                             onLoadNewVideo = { videoListItem ->
                                 logger.fInfo { "on load new video: $videoListItem" }
-                                var aid = 0L
-                                var cid = 0L
-                                var epid: Int? = null
-                                var seasonId: Int? = null
-
                                 when (videoListItem) {
-                                    is VideoListPart -> {
-                                        aid = videoListItem.aid
-                                        cid = videoListItem.cid
-                                        epid = videoListItem.epid
-                                        seasonId = videoListItem.seasonId
-                                    }
-
-                                    is VideoListUgcEpisode -> {
-                                        aid = videoListItem.aid
-                                        cid = videoListItem.cid
-                                        epid = videoListItem.epid
-                                        seasonId = videoListItem.seasonId
-                                    }
-
-                                    is VideoListPgcEpisode -> {
-                                        aid = videoListItem.aid
-                                        cid = videoListItem.cid
-                                        epid = videoListItem.epid
-                                        seasonId = videoListItem.seasonId
+                                    is VideoListItemData -> {
+                                        val targetCid = videoListItem.cid ?: return@BvPlayer
+                                        if (videoListItem is VideoListInteractiveNode) {
+                                            playerViewModel.selectInteractiveNode(videoListItem.nodeId)
+                                        }
+                                        playerViewModel.loadPlayUrl(
+                                            avid = videoListItem.aid,
+                                            cid = targetCid,
+                                            epid = videoListItem.epid,
+                                            seasonId = videoListItem.seasonId,
+                                            continuePlayNext = true,
+                                            initialSeekPositionMs = (videoListItem as? VideoListInteractiveNode)?.startPos?.times(1000L)
+                                        )
                                     }
                                 }
-                                playerViewModel.loadPlayUrl(
-                                    avid = aid,
-                                    cid = cid,
-                                    epid = epid,
-                                    seasonId = seasonId,
-                                    continuePlayNext = true
-                                )
                             }
                         )
                     }
@@ -463,11 +525,22 @@ fun VideoPlayerScreen(
                                             item {
                                                 VideoPlayerPages(
                                                     currentCid = playerViewModel.currentCid,
+                                                    interactiveNodes = videoDetailViewModel.videoDetail?.interactiveNodes
+                                                        ?: emptyList(),
                                                     pages = videoDetailViewModel.videoDetail?.pages
                                                         ?: emptyList(),
                                                     ugcSeason = videoDetailViewModel.videoDetail?.ugcSeason,
                                                     pgcSections = seasonVideModel.seasonData?.sections
                                                         ?: emptyList(),
+                                                    onClickInteractiveNode = { node ->
+                                                        playerViewModel.selectInteractiveNode(node.nodeId)
+                                                        playerViewModel.loadPlayUrl(
+                                                            avid = videoDetailViewModel.videoDetail!!.aid,
+                                                            cid = node.cid,
+                                                            continuePlayNext = true,
+                                                            initialSeekPositionMs = node.startPos?.times(1000L)
+                                                        )
+                                                    },
                                                     onClickPage = { videoPage ->
                                                         playerViewModel.loadPlayUrl(
                                                             avid = videoDetailViewModel.videoDetail!!.aid,
@@ -571,9 +644,20 @@ fun VideoPlayerScreen(
                                     .padding(vertical = 12.dp)
                                     .clip(MaterialTheme.shapes.medium),
                                 currentCid = playerViewModel.currentCid,
+                                interactiveNodes = videoDetailViewModel.videoDetail?.interactiveNodes
+                                    ?: emptyList(),
                                 pages = videoDetailViewModel.videoDetail?.pages ?: emptyList(),
                                 ugcSeason = videoDetailViewModel.videoDetail?.ugcSeason,
                                 pgcSections = seasonVideModel.seasonData?.sections ?: emptyList(),
+                                onClickInteractiveNode = { node ->
+                                    playerViewModel.selectInteractiveNode(node.nodeId)
+                                    playerViewModel.loadPlayUrl(
+                                        avid = videoDetailViewModel.videoDetail!!.aid,
+                                        cid = node.cid,
+                                        continuePlayNext = true,
+                                        initialSeekPositionMs = node.startPos?.times(1000L)
+                                    )
+                                },
                                 onClickPage = { videoPage ->
                                     playerViewModel.loadPlayUrl(
                                         avid = videoDetailViewModel.videoDetail!!.aid,

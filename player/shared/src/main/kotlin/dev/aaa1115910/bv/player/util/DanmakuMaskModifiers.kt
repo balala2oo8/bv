@@ -7,13 +7,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.toIntSize
@@ -24,50 +22,47 @@ import dev.aaa1115910.biliapi.entity.danmaku.DanmakuWebMaskFrame
 
 /**
  * 使用预转换的 ImageBitmap 进行蒙版绘制，避免每帧 Bitmap→ImageBitmap 转换开销。
- * saveLayer + DstIn 混合模式实现蒙版裁切。
+ * 使用 CompositingStrategy.Offscreen 进行离屏合成，避免每帧 saveLayer 开销。
  */
 fun Modifier.bitmapMask(
     imageBitmap: ImageBitmap,
     videoAspectRatio: Float,
     areaRatio: Float
-): Modifier = drawWithContent {
-    drawIntoCanvas { canvas ->
-        canvas.saveLayer(Rect(Offset.Zero, size), Paint())
-        drawContent()
+): Modifier = graphicsLayer {
+    compositingStrategy = CompositingStrategy.Offscreen
+}.drawWithContent {
+    drawContent()
 
+    val safeArea = if (areaRatio <= 0f) 1f else areaRatio
+    val screenWidth = size.width
+    val screenHeight = size.height / safeArea
+    val screenAspectRatio = screenWidth / screenHeight
 
-        val safeArea = if (areaRatio <= 0f) 1f else areaRatio
-        val screenWidth = size.width
-        val screenHeight = size.height / safeArea
-        val screenAspectRatio = screenWidth / screenHeight
+    val dstWidth: Float
+    val dstHeight: Float
+    val offsetX: Float
+    val offsetY: Float
 
-        val dstWidth: Float
-        val dstHeight: Float
-        val offsetX: Float
-        val offsetY: Float
+    if (videoAspectRatio > screenAspectRatio) {
+        dstWidth = screenWidth
+        dstHeight = dstWidth / videoAspectRatio
 
-        if (videoAspectRatio > screenAspectRatio) {
-            dstWidth = screenWidth
-            dstHeight = dstWidth / videoAspectRatio
+        offsetX = 0f
+        offsetY = (screenHeight - dstHeight) / 2f
+    } else {
+        dstHeight = screenHeight
+        dstWidth = dstHeight * videoAspectRatio
 
-            offsetX = 0f
-            offsetY = (screenHeight - dstHeight) / 2f
-        } else {
-            dstHeight = screenHeight
-            dstWidth = dstHeight * videoAspectRatio
-
-            offsetY = 0f
-            offsetX = (screenWidth - dstWidth) / 2f
-        }
-
-        drawImage(
-            image = imageBitmap,
-            dstOffset = IntOffset(offsetX.toInt(), offsetY.toInt()),
-            dstSize = IntSize(dstWidth.toInt(), dstHeight.toInt()),
-            blendMode = BlendMode.DstIn
-        )
-        canvas.restore()
+        offsetY = 0f
+        offsetX = (screenWidth - dstWidth) / 2f
     }
+
+    drawImage(
+        image = imageBitmap,
+        dstOffset = IntOffset(offsetX.toInt(), offsetY.toInt()),
+        dstSize = IntSize(dstWidth.toInt(), dstHeight.toInt()),
+        blendMode = BlendMode.DstIn
+    )
 }
 
 /**
@@ -104,17 +99,19 @@ fun Modifier.danmakuMobMask(
     areaRatio: Float
 ): Modifier = composed {
     val cachedImage = remember(frame) {
-        val width = 40
-        val height = 180
-        val pixels = IntArray(width * height)
-        val black = Color.BLACK
-        val transparent = Color.TRANSPARENT
-        for (i in pixels.indices) {
-            pixels[i] = if (frame.image[i].toInt() == 0) black else transparent
+        val width = frame.width
+        val height = frame.height
+        val binaryBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // 1bpp 连续 bit 流，MSB first
+        val pixels = IntArray(width * height) { i ->
+            val byteIndex = i / 8
+            val bitOffset = 7 - (i % 8)
+            val bit = (frame.image[byteIndex].toInt() shr bitOffset) and 1
+            if (bit == 0) Color.TRANSPARENT else Color.BLACK
         }
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        bitmap.asImageBitmap()
+        binaryBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        binaryBitmap.asImageBitmap()
     }
 
     bitmapMask(cachedImage, videoAspectRatio, areaRatio)

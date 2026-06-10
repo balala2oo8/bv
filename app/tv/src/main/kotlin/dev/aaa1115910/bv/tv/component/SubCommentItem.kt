@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -26,6 +27,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -48,11 +50,13 @@ import kotlinx.coroutines.launch
  *
  * @param comment 评论数据
  * @param modifier 修饰符
+ * @param onLongClick 长按回调
  */
 @Composable
 fun SubCommentItem(
     comment: Comment,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLongClick: () -> Unit = {}
 ) {
     // 子评论有焦点边框，但不响应点击
     Surface(
@@ -60,6 +64,7 @@ fun SubCommentItem(
             .fillMaxWidth()
             .focusedBorder(MaterialTheme.shapes.small),
         onClick = { /* 空回调，不执行任何操作 */ },
+        onLongClick = onLongClick,
         colors = ClickableSurfaceDefaults.colors(
             containerColor = Color.Transparent,
             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
@@ -88,6 +93,7 @@ fun SubCommentItem(
 
             // 内容
             Column(
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // 用户名
@@ -102,6 +108,14 @@ fun SubCommentItem(
                     content = comment.content,
                     emotes = comment.emotes
                 )
+
+                // 评论图片
+                if (comment.pictures.isNotEmpty()) {
+                    CommentPictures(
+                        pictures = comment.pictures,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
 
                 // 底部信息
                 Row(
@@ -127,12 +141,15 @@ fun SubCommentItem(
  * 子评论根评论显示组件（只读，右键展开/收起，展开后下键滚动）
  *
  * @param comment 评论数据
+ * @param onLongClick 长按回调
  */
 @Composable
 fun SubCommentRootItem(
-    comment: Comment
+    comment: Comment,
+    onLongClick: () -> Unit = {}
 ) {
     var expanded by remember { mutableStateOf(false) }
+    var contentExceedsLimit by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -140,12 +157,14 @@ fun SubCommentRootItem(
 
     Surface(
         onClick = { /* 右键展开/收起 */ },
+        onLongClick = onLongClick,
         modifier = Modifier
+            .fillMaxWidth()
             .focusRequester(focusRequester)
             .onPreviewKeyEvent { event ->
                 when {
-                    // 右键展开/收起
-                    event.isKeyDown() && event.isDpadRight() -> {
+                    // 右键展开/收起（仅内容超出高度限制时）
+                    event.isKeyDown() && event.isDpadRight() && contentExceedsLimit -> {
                         expanded = !expanded
                         if (expanded) {
                             scope.launch { scrollState.scrollTo(0) }
@@ -175,18 +194,24 @@ fun SubCommentRootItem(
         shape = ClickableSurfaceDefaults.shape(shape = MaterialTheme.shapes.small)
     ) {
         Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .then(
-                    if (expanded) {
-                        Modifier.height(200.dp).verticalScroll(scrollState)
-                    } else {
-                        Modifier
-                    }
-                ),
+            modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
+                modifier = Modifier
+                    .then(
+                        if (expanded) {
+                            Modifier.heightIn(max = 300.dp).verticalScroll(scrollState)
+                        } else {
+                            Modifier.heightIn(max = 150.dp)
+                        }
+                    )
+                    .onSizeChanged { size ->
+                        if (!expanded && !contentExceedsLimit) {
+                            val limitPx = with(density) { 150.dp.toPx() }
+                            contentExceedsLimit = size.height >= limitPx.toInt()
+                        }
+                    },
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = androidx.compose.ui.Alignment.Top
             ) {
@@ -200,6 +225,7 @@ fun SubCommentRootItem(
                 )
 
                 Column(
+                    modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
@@ -216,12 +242,13 @@ fun SubCommentRootItem(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    // 展开/收起提示
-                    Text(
-                        text = if (expanded) "右键收起 <<" else "右键展开 >>",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White
-                    )
+                    // 评论图片
+                    if (comment.pictures.isNotEmpty()) {
+                        CommentPictures(
+                            pictures = comment.pictures,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -238,6 +265,16 @@ fun SubCommentRootItem(
                         )
                     }
                 }
+            }
+
+            // 展开/收起提示（仅内容超出高度限制时显示）
+            if (contentExceedsLimit) {
+                Text(
+                    text = if (expanded) "右键收起 <<" else "右键展开 >>",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White,
+                    modifier = Modifier.padding(start = 48.dp)
+                )
             }
         }
     }

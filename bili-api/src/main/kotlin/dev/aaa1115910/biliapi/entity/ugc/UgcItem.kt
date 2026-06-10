@@ -7,6 +7,13 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 
 data class UgcItem(
     val aid: Long,
@@ -20,6 +27,7 @@ data class UgcItem(
     val danmaku: Int,
     val duration: Int,
     val idx: Int = -1,
+    val isInteractive: Boolean = false,
     val pubTime: String? = null,
 ) {
     companion object {
@@ -66,6 +74,7 @@ data class UgcItem(
                 play = rcmdItem.stat?.view ?: -1L,
                 danmaku = rcmdItem.stat?.danmaku ?: -1,
                 duration = rcmdItem.duration,
+                isInteractive = rcmdItem.avFeature.resolveInteractiveFlag(),
                 pubTime = rcmdItem.pubdate.smartDate
             )
 
@@ -80,6 +89,7 @@ data class UgcItem(
                 cover = videoInfo.pic,
                 play = videoInfo.stat.view,
                 danmaku = videoInfo.stat.danmaku,
+                isInteractive = videoInfo.rights.isSteinGate == 1,
                 pubTime = videoInfo.pubdate.smartDate
             )
 
@@ -202,5 +212,65 @@ fun Long.toSmartDate(timeZone: TimeZone = TimeZone.getDefault()): String? {
     }
 }
 
+/**
+ * 智能日期格式化 (兼容低版本 Android)
+ * @param timeZone 时区 (默认系统时区)
+ */
+fun Long.toSmartDateTime(timeZone: TimeZone = TimeZone.getDefault()): String? {
+    if (this <= 0) return null
+
+    try {
+        // 自动识别秒级或毫秒级时间戳
+        // 秒级时间戳通常小于等于10位数，目前直到2286年都是10位数
+        // 毫秒级时间戳通常为13位数
+        val timeInMillis = if (this < 10000000000L) this * 1000L else this
+        val temp = System.currentTimeMillis() - timeInMillis
+        return when {
+            temp > 1000L * 60 * 60 * 24 -> SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINESE).apply {
+                this.timeZone = timeZone
+            }.format(
+                timeInMillis
+            )
+
+            temp > 1000L * 60 * 60 -> "${temp / (1000 * 60 * 60)}小时前"
+            temp > 1000L * 60 -> "${temp / (1000 * 60)}分钟前"
+            else -> "刚刚"
+        }
+    } catch (e: Exception) {
+        return null
+    }
+}
+
 val Int.smartDate: String?
     get() = this.toLong().toSmartDate()
+
+private fun JsonElement?.resolveInteractiveFlag(): Boolean {
+    return when (this) {
+        is JsonObject -> this.any { (key, value) ->
+            if (key in interactiveFlagKeys) {
+                value.isTruthy()
+            } else {
+                value.resolveInteractiveFlag()
+            }
+        }
+
+        is JsonArray -> this.any { it.resolveInteractiveFlag() }
+        else -> false
+    }
+}
+
+private fun JsonElement.isTruthy(): Boolean {
+    return when (this) {
+        is JsonPrimitive -> booleanOrNull == true || intOrNull == 1 || contentOrNull == "1"
+        else -> false
+    }
+}
+
+private val interactiveFlagKeys = setOf(
+    "is_story",
+    "is_steins",
+    "is_steins_gate",
+    "isStory",
+    "isSteins",
+    "isSteinGate"
+)
